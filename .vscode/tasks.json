@@ -1,0 +1,161 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "Run Backend Server",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["run", "--bin", "server"],
+            "options": {
+                "cwd": "${workspaceFolder}/Saas-Project/backend"
+            },
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "new",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "isBackground": true,
+            "problemMatcher": ["$rustc"],
+            "runOptions": {
+                "instanceLimit": 1
+            }
+        },
+        {
+            "label": "Build Backend",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["build"],
+            "options": {
+                "cwd": "${workspaceFolder}/Saas-Project/backend"
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "Check Backend",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["check"],
+            "options": {
+                "cwd": "${workspaceFolder}/Saas-Project/backend"
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "Test Backend",
+            "type": "shell",
+            "command": "cargo",
+            "args": ["test"],
+            "options": {
+                "cwd": "${workspaceFolder}/Saas-Project/backend"
+            },
+            "group": "test",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "problemMatcher": ["$rustc"]
+        },
+        {
+            "label": "Start Docker Services",
+            "type": "shell",
+            "command": "docker",
+            "args": ["compose", "up", "-d"],
+            "options": {
+                "cwd": "${workspaceFolder}/Saas-Project"
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "Stop Docker Services",
+            "type": "shell",
+            "command": "docker",
+            "args": ["compose", "down"],
+            "options": {
+                "cwd": "${workspaceFolder}/Saas-Project"
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        },
+        {
+            "label": "Run Database Migrations",
+            "type": "shell",
+            "command": "sqlx",
+            "args": ["migrate", "run"],
+            "options": {
+                "cwd": "${workspaceFolder}/Saas-Project/backend"
+            },
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            },
+            "dependsOn": "Start Docker Services"
+        },
+        {
+            "label": "Full Development Setup",
+            "dependsOrder": "sequence",
+            "dependsOn": [
+                "Start Docker Services",
+                "Run Database Migrations",
+                "Run Backend Server"
+            ],
+            "group": "build",
+            "presentation": {
+                "echo": true,
+                "reveal": "always",
+                "focus": false,
+                "panel": "shared",
+                "showReuseMessage": true,
+                "clear": false
+            }
+        }
+    ]
+}

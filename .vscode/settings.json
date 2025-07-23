@@ -1,0 +1,43 @@
+{
+    "rust-analyzer.linkedProjects": [
+        "${workspaceFolder}/Saas-Project/backend/Cargo.toml"
+    ],
+    "rust-analyzer.cargo.buildScripts.enable": true,
+    "rust-analyzer.procMacro.enable": true,
+    "rust-analyzer.checkOnSave.command": "check",
+    "rust-analyzer.checkOnSave.allTargets": false,
+    "rust-analyzer.diagnostics.enable": true,
+    "rust-analyzer.inlayHints.enable": true,
+    "rust-analyzer.completion.addCallArgumentSnippets": true,
+    "rust-analyzer.completion.addCallParenthesis": true,
+    "files.associations": {
+        "*.rs": "rust"
+    },
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "rust-lang.rust-analyzer",
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer",
+        "editor.formatOnSave": true
+    },
+    "[json]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[typescript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[javascript]": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "terminal.integrated.cwd": "${workspaceFolder}",
+    "files.exclude": {
+        "**/target": true,
+        "**/node_modules": true,
+        "**/.git": true,
+        "**/.DS_Store": true
+    },
+    "search.exclude": {
+        "**/target": true,
+        "**/node_modules": true,
+        "**/.git": true
+    }
+}

@@ -1,0 +1,135 @@
+# SaaS UMKM Platform - Git Ignore
+
+# Environment variables
+.env
+.env.local
+.env.development
+.env.development.local
+.env.test
+.env.test.local
+.env.production
+.env.production.local
+
+# Dependencies
+node_modules/
+/backend/target/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Production builds
+/frontend/.next/
+/frontend/out/
+/frontend/build/
+/backend/target/release/
+/backend/target/debug/
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Coverage directory used by tools like istanbul
+coverage/
+*.lcov
+
+# Logs
+logs
+*.log
+
+# Runtime data
+*.tgz
+*.tar.gz
+
+# IDE and editor files
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.swp
+*.swo
+*~
+.history/
+*.sublime-project
+*.sublime-workspace
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads and temporary files
+uploads/
+temp/
+tmp/
+
+# Docker
+.dockerignore
+
+# Rust specific
+**/*.rs.bk
+# Mencatat Cargo.lock itu penting untuk reproducible builds pada aplikasi binary
+# Hanya exclude Cargo.lock jika library, BUKAN untuk aplikasi
+# /Cargo.lock
+.rustc_info.json
+/backend/.cargo-ok
+/backend/debug/
+/backend/release/
+
+# Next.js specific
+.next/
+out/
+next-env.d.ts
+
+# Testing
+/coverage
+.nyc_output
+
+# Vercel
+.vercel
+
+# Render specific
+.render/
+.render-buildpacks/
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Local development
+.local/
+.dev/
+*.local
+local_settings.py
+
+# Local development
+.dev/
+.local/
+
+# Monitoring and logs
+/infrastructure/logs/
+/logs/
+
+# Backup files
+*.backup
+*.bak
+
+# Cache
+.cache/
+*.cache

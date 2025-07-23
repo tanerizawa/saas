@@ -1,0 +1,67 @@
+{
+  "folders": [
+    {
+      "name": "📂 SaaS UMKM Platform",
+      "path": "."
+    },
+    {
+      "name": "🦀 Backend (Rust)",
+      "path": "./backend"
+    },
+    {
+      "name": "⚛️ Frontend (Next.js)",
+      "path": "./frontend"
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/target": true,
+      "**/.git": true,
+      "**/.DS_Store": true,
+      "**/dist": true,
+      "**/.next": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/target": true,
+      "**/.next": true,
+      "**/dist": true
+    },
+    "rust-analyzer.linkedProjects": ["./backend/Cargo.toml"],
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "typescript.preferences.includePackageJsonAutoImports": "on",
+    "eslint.workingDirectories": ["./frontend"],
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": true
+    },
+    "[rust]": {
+      "editor.defaultFormatter": "rust-lang.rust-analyzer"
+    },
+    "[typescript]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[typescriptreact]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    },
+    "[json]": {
+      "editor.defaultFormatter": "esbenp.prettier-vscode"
+    }
+  },
+  "extensions": {
+    "recommendations": [
+      "rust-lang.rust-analyzer",
+      "vadimcn.vscode-lldb",
+      "serayuzgur.crates",
+      "ms-vscode.vscode-typescript-next",
+      "bradlc.vscode-tailwindcss",
+      "esbenp.prettier-vscode",
+      "dbaeumer.vscode-eslint",
+      "ms-vscode.vscode-json",
+      "yzhang.markdown-all-in-one",
+      "github.copilot",
+      "github.copilot-chat"
+    ]
+  }
+}

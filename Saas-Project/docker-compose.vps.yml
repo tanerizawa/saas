@@ -1,0 +1,125 @@
+version: '3.8'
+
+# Docker Compose configuration optimized for VPS deployment
+# Server: srv903479.hstgr.cloud (31.97.109.198)
+# System: Ubuntu Linux 24.04.2
+# CPU: AMD EPYC 9354P (2 cores)
+# Memory: 7.75 GiB total
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-saas_umkm}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      - "5432:5432"
+    command: >
+      postgres
+      -c shared_buffers=1GB
+      -c effective_cache_size=3GB
+      -c maintenance_work_mem=256MB
+      -c work_mem=32MB
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c max_worker_processes=2
+      -c max_parallel_workers_per_gather=1
+      -c max_parallel_workers=2
+      -c wal_buffers=16MB
+      -c checkpoint_timeout=15min
+      -c checkpoint_completion_target=0.9
+      -c max_connections=50
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 2G
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - backend-network
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          cpus: '0.2'
+          memory: 384M
+        reservations:
+          memory: 128M
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend-network
+
+  # Backend monolithic application
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: "postgres://${DB_USER:-postgres}:${DB_PASSWORD:-postgres}@postgres:5432/${DB_NAME:-saas_umkm}"
+      REDIS_URL: "redis://redis:6379"
+      JWT_SECRET: ${JWT_SECRET:-default_jwt_secret_for_development}
+      RUST_MIN_THREADS: 4
+      RUST_MAX_THREADS: 8
+      RUST_LOG: info
+      RUST_BACKTRACE: 0
+      RUST_LOG_SPAN_EVENTS: never
+      MALLOC_ARENA_MAX: 2
+      MALLOC_TRIM_THRESHOLD_: 65536
+    ports:
+      - "9000:9000" # API
+      - "3001:3000" # Frontend
+    volumes:
+      - uploads:/app/uploads
+      - ./config:/app/config:ro
+    depends_on:
+      - postgres
+      - redis
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 3.5G
+        reservations:
+          memory: 512M
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - backend-network
+
+networks:
+  backend-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:

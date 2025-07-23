@@ -1,0 +1,63 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "🦀 Debug Backend Server",
+      "cargo": {
+        "args": ["build", "--bin=server", "--package=saas-umkm-backend"],
+        "filter": {
+          "name": "server",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/backend",
+      "env": {
+        "RUST_LOG": "debug",
+        "DATABASE_URL": "postgresql://postgres:password@localhost:5432/saas_umkm_dev",
+        "JWT_SECRET": "your-development-secret-key-here",
+        "APP_HOST": "127.0.0.1",
+        "APP_PORT": "8000"
+      },
+      "console": "integratedTerminal",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "🦀 Debug Backend Migration",
+      "cargo": {
+        "args": ["build", "--bin=migrate", "--package=saas-umkm-backend"],
+        "filter": {
+          "name": "migrate",
+          "kind": "bin"
+        }
+      },
+      "args": [],
+      "cwd": "${workspaceFolder}/backend",
+      "env": {
+        "RUST_LOG": "debug",
+        "DATABASE_URL": "postgresql://postgres:password@localhost:5432/saas_umkm_dev"
+      },
+      "console": "integratedTerminal",
+      "sourceLanguages": ["rust"]
+    },
+    {
+      "type": "node",
+      "request": "launch",
+      "name": "⚛️ Debug Frontend (Next.js)",
+      "program": "${workspaceFolder}/frontend/node_modules/.bin/next",
+      "args": ["dev"],
+      "cwd": "${workspaceFolder}/frontend",
+      "env": {
+        "NODE_ENV": "development",
+        "NEXT_PUBLIC_API_URL": "http://localhost:8000/api/v1"
+      },
+      "console": "integratedTerminal",
+      "runtimeExecutable": "node",
+      "skipFiles": ["<node_internals>/**"]
+    }
+  ]
+}

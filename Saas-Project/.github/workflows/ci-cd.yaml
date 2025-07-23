@@ -1,0 +1,236 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  REGISTRY: ghcr.io
+  BACKEND_IMAGE_NAME: saas-umkm/backend
+  FRONTEND_IMAGE_NAME: saas-umkm/frontend
+  KUBECONFIG_FILE: ${{ secrets.KUBECONFIG }}
+  CLUSTER_NAME: saas-umkm-cluster
+
+jobs:
+  test-backend:
+    name: Test Backend
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: test
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Run tests
+        run: |
+          cd backend
+          cargo test --verbose
+
+      - name: Run linting
+        run: |
+          cd backend
+          cargo clippy -- -D warnings
+
+  test-frontend:
+    name: Test Frontend
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Run tests
+        run: |
+          cd frontend
+          npm test
+
+      - name: Run type checking
+        run: |
+          cd frontend
+          npm run type-check
+
+      - name: Run linting
+        run: |
+          cd frontend
+          npm run lint
+
+  build-and-push-backend:
+    name: Build and Push Backend Image
+    needs: [test-backend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.BACKEND_IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch
+            latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: ./backend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  build-and-push-frontend:
+    name: Build and Push Frontend Image
+    needs: [test-frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v2
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.FRONTEND_IMAGE_NAME }}
+          tags: |
+            type=sha,format=long
+            type=ref,event=branch
+            latest
+
+      - name: Build and push
+        uses: docker/build-push-action@v4
+        with:
+          context: ./frontend
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to Kubernetes
+    needs: [build-and-push-backend, build-and-push-frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v3
+        with:
+          version: 'v1.27.3'
+
+      - name: Create kubeconfig
+        run: |
+          mkdir -p $HOME/.kube
+          echo "${{ secrets.KUBECONFIG }}" > $HOME/.kube/config
+          chmod 600 $HOME/.kube/config
+
+      - name: Set image tag
+        run: echo "IMAGE_TAG=sha-$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Update deployment files with current image tag
+        run: |
+          cd infrastructure/kubernetes
+          find . -type f -name "*.yaml" -exec sed -i 's/\${REGISTRY}/ghcr.io/g' {} \;
+          find . -type f -name "*.yaml" -exec sed -i "s/\${TAG}/${{ env.IMAGE_TAG }}/g" {} \;
+
+      - name: Update secrets in config files
+        run: |
+          cd infrastructure/kubernetes
+          sed -i "s/\${BASE64_DB_PASSWORD}/${{ secrets.BASE64_DB_PASSWORD }}/g" config.yaml
+          sed -i "s/\${BASE64_DB_URL}/${{ secrets.BASE64_DB_URL }}/g" config.yaml
+          sed -i "s/\${BASE64_REDIS_PASSWORD}/${{ secrets.BASE64_REDIS_PASSWORD }}/g" config.yaml
+          sed -i "s/\${BASE64_REDIS_URL}/${{ secrets.BASE64_REDIS_URL }}/g" config.yaml
+          sed -i "s/\${BASE64_JWT_SECRET}/${{ secrets.BASE64_JWT_SECRET }}/g" config.yaml
+          sed -i "s/\${BASE64_TOTP_SECRET}/${{ secrets.BASE64_TOTP_SECRET }}/g" config.yaml
+
+      - name: Apply Kubernetes manifests
+        run: |
+          kubectl apply -f infrastructure/kubernetes/config.yaml
+          kubectl apply -f infrastructure/kubernetes/postgres-statefulset.yaml
+          kubectl apply -f infrastructure/kubernetes/redis-deployment.yaml
+          kubectl apply -f infrastructure/kubernetes/backend-deployment.yaml
+          kubectl apply -f infrastructure/kubernetes/frontend-deployment.yaml
+          kubectl apply -f infrastructure/kubernetes/ingress.yaml
+
+      - name: Verify deployment
+        run: |
+          kubectl get pods -n saas-umkm
+          kubectl get services -n saas-umkm
+          kubectl get ingress -n saas-umkm

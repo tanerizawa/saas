@@ -1,0 +1,106 @@
+[package]
+name = "saas-umkm-backend"
+version = "0.1.0"
+edition = "2021"
+authors = ["SaaS UMKM Team"]
+description = "Backend API for Indonesian SME licensing and business management platform"
+
+[dependencies]
+# Web Framework (Axum as recommended in document)
+axum = { version = "0.7", features = ["macros"] }
+axum-extra = { version = "0.9", features = ["cookie", "typed-header"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace", "compression-br", "fs"] }
+tokio = { version = "1.0", features = ["full"] }
+hyper = "1.0"
+
+# Database (PostgreSQL with SQLx as recommended)
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json", "bigdecimal"] }
+sea-query = "0.30"
+sea-query-postgres = "0.4"
+
+# Caching (Redis for Phase 4 performance optimization)
+redis = { version = "0.24", features = ["tokio-comp", "json", "connection-manager"] }
+
+# Authentication & Security (JWT + RBAC as recommended)
+jsonwebtoken = "9.0"
+argon2 = "0.5"  # Password hashing as recommended in document
+rust-rbac = "0.1"  # RBAC implementation as mentioned in document
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Validation
+validator = { version = "0.16", features = ["derive"] }
+
+# Date and Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Configuration
+config = "0.14"
+dotenvy = "0.15"
+
+# Logging and Tracing (structured logging as recommended)
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-appender = "0.2"
+
+# Error Handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# HTTP Client (for external API integration)
+reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
+
+# File Upload and Storage
+multipart = "0.18"
+mime = "0.3"
+
+# Environment
+env_logger = "0.10"
+
+# Async runtime utilities
+async-trait = "0.1"
+futures = "0.3"
+
+# Security utilities
+rand = "0.8"
+rand_core = { version = "0.6", features = ["std"] }
+
+# Email sending (for notifications)
+lettre = "0.11"
+
+# Rate limiting
+governor = "0.6"
+
+# Metrics (Prometheus integration as recommended)
+metrics = "0.22"
+metrics-exporter-prometheus = "0.13"
+
+# Redis client (for caching and sessions)
+# Redis dependency already included above
+
+[dev-dependencies]
+tokio-test = "0.4"
+assert_matches = "1.5"
+
+[[bin]]
+name = "server"
+path = "src/main.rs"
+
+[[bin]]
+name = "migrate"
+path = "src/bin/migrate.rs"
+
+[profile.dev]
+debug = true
+opt-level = 0
+
+[profile.release]
+debug = false
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

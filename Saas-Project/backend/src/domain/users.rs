@@ -58,8 +58,28 @@ impl Email {
     }
 
     fn is_valid(email: &str) -> bool {
-        // Basic email validation
-        email.contains('@') && email.contains('.') && email.len() > 5
+        // Simple email validation without using regex
+        let parts: Vec<&str> = email.split('@').collect();
+        if parts.len() != 2 {
+            return false;
+        }
+        let local = parts[0];
+        let domain = parts[1];
+
+        if local.is_empty() || domain.is_empty() {
+            return false;
+        }
+
+        // domain must contain a dot not at the start or end
+        if let Some(pos) = domain.find('.') {
+            if pos == 0 || pos == domain.len() - 1 {
+                return false;
+            }
+        } else {
+            return false;
+        }
+
+        true
     }
 }
 

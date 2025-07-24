@@ -17,6 +17,7 @@ use crate::{
         ApplicationStatus, ApplicationStatusHistory, License, LicenseDocument, LicenseType,
         PriorityLevel,
     },
+    domain::entities::UserRole,
     infrastructure::repositories::license_repository::LicenseStatistics,
     // infrastructure::repositories::LicenseRepository,
     infrastructure::web::middleware::auth::AuthenticatedUser,
@@ -401,8 +402,9 @@ async fn approve_license(
     Path(license_id): Path<Uuid>,
     Json(request): Json<ApproveLicenseRequest>,
 ) -> Result<Json<License>, StatusCode> {
-    // TODO: Add admin role check here
-    // For now, assuming the authenticated user is admin
+    if admin_user.role != UserRole::SuperAdmin && admin_user.role != UserRole::AdminStaff {
+        return Err(StatusCode::FORBIDDEN);
+    }
 
     match app_state
         .license_repository
@@ -432,8 +434,9 @@ async fn reject_license(
     Path(license_id): Path<Uuid>,
     Json(request): Json<RejectLicenseRequest>,
 ) -> Result<Json<License>, StatusCode> {
-    // TODO: Add admin role check here
-    // For now, assuming the authenticated user is admin
+    if admin_user.role != UserRole::SuperAdmin && admin_user.role != UserRole::AdminStaff {
+        return Err(StatusCode::FORBIDDEN);
+    }
 
     match app_state
         .license_repository

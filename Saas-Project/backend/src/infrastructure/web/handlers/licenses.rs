@@ -1,12 +1,13 @@
 #![allow(dead_code)]
 
 use axum::{
-    extract::{Path, Query, State},
+    extract::{Multipart, Path, Query, State},
     http::StatusCode,
     response::Json,
     routing::{delete, get, post, put},
     Router,
 };
+use tokio::fs;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 // use std::sync::Arc;
@@ -14,8 +15,8 @@ use uuid::Uuid;
 
 use crate::{
     domain::licenses::{
-        ApplicationStatus, ApplicationStatusHistory, License, LicenseDocument, LicenseType,
-        PriorityLevel,
+        ApplicationStatus, ApplicationStatusHistory, DocumentType, License, LicenseDocument,
+        LicenseType, PriorityLevel,
     },
     domain::entities::UserRole,
     infrastructure::repositories::license_repository::LicenseStatistics,
@@ -515,16 +516,89 @@ async fn get_license_documents(
     }
 }
 
-// Upload license document (placeholder - will need multipart form handling)
+// Determine document type based on multipart field name
+fn determine_document_type(field_name: &str) -> DocumentType {
+    match field_name {
+        "ktp" => DocumentType::Ktp,
+        "company_deed" => DocumentType::CompanyDeed,
+        "tax_certificate" => DocumentType::TaxCertificate,
+        "bank_statement" => DocumentType::BankStatement,
+        "business_plan" => DocumentType::BusinessPlan,
+        "location_permit" => DocumentType::LocationPermit,
+        _ => DocumentType::Other,
+    }
+}
+
+// Upload license document
 async fn upload_license_document(
-    State(_app_state): State<AppState>,
-    _user: AuthenticatedUser,
-    Path(_license_id): Path<Uuid>,
+    State(app_state): State<AppState>,
+    user: AuthenticatedUser,
+    Path(license_id): Path<Uuid>,
+    mut multipart: Multipart,
 ) -> Result<Json<LicenseDocument>, StatusCode> {
-    // TODO: Implement file upload handling with multipart forms
-    // This will require additional dependencies like tower-http for multipart
-    // For now, return not implemented
-    Err(StatusCode::NOT_IMPLEMENTED)
+    // Verify license ownership
+    let license = match app_state.license_repository.get_license_by_id(license_id).await {
+        Ok(Some(license)) => {
+            if license.user_id != *user.user_id.as_uuid() {
+                return Err(StatusCode::FORBIDDEN);
+            }
+            license
+        }
+        Ok(None) => return Err(StatusCode::NOT_FOUND),
+        Err(e) => {
+            tracing::error!("Failed to get license: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+    };
+
+    let base_dir = format!("{}/{}", app_state.config.upload_dir, license.id);
+    if let Err(e) = fs::create_dir_all(&base_dir).await {
+        tracing::error!("Failed to create upload directory: {}", e);
+        return Err(StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    while let Some(field) = multipart.next_field().await.map_err(|_| StatusCode::BAD_REQUEST)? {
+        let name = field.name().unwrap_or("file").to_string();
+        let original_file_name = field.file_name().unwrap_or("upload.bin").to_string();
+        let content_type = field
+            .content_type()
+            .map(|ct| ct.to_string())
+            .unwrap_or_else(|| "application/octet-stream".to_string());
+        let data = field.bytes().await.map_err(|_| StatusCode::BAD_REQUEST)?;
+
+        if data.len() as u64 > app_state.config.max_file_size {
+            return Err(StatusCode::PAYLOAD_TOO_LARGE);
+        }
+
+        let sanitized_name = original_file_name.replace(['/', '\\'], "_");
+        let file_name = format!("{}-{}", Uuid::new_v4(), sanitized_name);
+        let file_path = format!("{}/{}", base_dir, file_name);
+
+        if let Err(e) = fs::write(&file_path, &data).await {
+            tracing::error!("Failed to save uploaded file: {}", e);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR);
+        }
+
+        let document = LicenseDocument::new(
+            license.id,
+            determine_document_type(&name),
+            file_name,
+            original_file_name,
+            file_path,
+            data.len() as i64,
+            content_type,
+        );
+
+        match app_state.license_repository.create_document(&document).await {
+            Ok(saved) => return Ok(Json(saved)),
+            Err(e) => {
+                tracing::error!("Failed to save document record: {}", e);
+                return Err(StatusCode::INTERNAL_SERVER_ERROR);
+            }
+        }
+    }
+
+    Err(StatusCode::BAD_REQUEST)
 }
 
 // Get license status history

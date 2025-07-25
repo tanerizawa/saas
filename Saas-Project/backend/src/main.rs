@@ -9,6 +9,7 @@ use tower_http::{
     compression::CompressionLayer,
     cors::{Any, CorsLayer},
     trace::TraceLayer,
+    services::ServeDir,
 };
 use tracing::{info, instrument, warn};
 
@@ -168,6 +169,8 @@ async fn create_app(state: AppState) -> Router {
     router = router
         // Health check endpoint
         .route("/health", get(health_check))
+        // Static file serving for uploads
+        .nest_service("/uploads", ServeDir::new(state.config.upload_dir.clone()))
         // API routes
         .nest("/api/v1", create_api_routes());
 

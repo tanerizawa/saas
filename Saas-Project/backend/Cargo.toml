@@ -7,7 +7,7 @@ description = "Backend API for Indonesian SME licensing and business management 
 
 [dependencies]
 # Web Framework (Axum as recommended in document)
-axum = { version = "0.7", features = ["macros"] }
+axum = { version = "0.7", features = ["macros", "multipart"] }
 axum-extra = { version = "0.9", features = ["cookie", "typed-header"] }
 tower = "0.4"
 tower-http = { version = "0.5", features = ["cors", "trace", "compression-br", "fs"] }

@@ -27,15 +27,23 @@ impl UserQueryHandler {
         page: u32,
         limit: u32,
     ) -> AppResult<PaginatedResponse<User>> {
-        // TODO: Implement when UserRepository has pagination methods
-        // For now, return empty paginated response
-        Ok(PaginatedResponse::new(vec![], 0, page, limit))
+        let offset = (page.saturating_sub(1) * limit) as i32;
+
+        let users = self
+            .user_repository
+            .list_all(Some(limit as i32), Some(offset))
+            .await?;
+
+        let total = self.user_repository.count_all().await? as u64;
+
+        Ok(PaginatedResponse::new(users, total, page, limit))
     }
 
     pub async fn handle_search_users(&self, email_query: &str) -> AppResult<Vec<User>> {
-        // TODO: Implement when UserRepository has search methods
-        let _ = email_query; // Suppress unused warning
-        Ok(vec![])
+        self
+            .user_repository
+            .search(email_query, None, None)
+            .await
     }
 }
 
@@ -57,20 +65,21 @@ impl LicenseQueryHandler {
     }
 
     pub async fn handle_list_licenses(&self, _query: ListLicensesQuery) -> AppResult<Vec<String>> {
-        // TODO: Implement actual license listing when license domain is ready
-        // This is a placeholder implementation
-        Ok(vec![
-            "NIB - Nomor Induk Berusaha".to_string(),
-            "SIUP - Surat Izin Usaha Perdagangan".to_string(),
-            "TDP - Tanda Daftar Perusahaan".to_string(),
-            "NPWP - Nomor Pokok Wajib Pajak".to_string(),
-        ])
+        if let Some(repo) = &self.license_repository {
+            let licenses = repo.search_licenses("", None).await?;
+            Ok(licenses.into_iter().map(|l| l.title).collect())
+        } else {
+            Ok(vec![])
+        }
     }
 
     pub async fn handle_get_user_licenses(&self, user_id: uuid::Uuid) -> AppResult<Vec<String>> {
-        // TODO: Implement when license repository is ready
-        let _ = user_id; // Suppress unused warning
-        Ok(vec![])
+        if let Some(repo) = &self.license_repository {
+            let licenses = repo.get_licenses_by_user(user_id).await?;
+            Ok(licenses.into_iter().map(|l| l.title).collect())
+        } else {
+            Ok(vec![])
+        }
     }
 }
 
@@ -100,7 +109,6 @@ mod tests {
 
         assert!(result.is_ok());
         let licenses = result.unwrap();
-        assert_eq!(licenses.len(), 4);
-        assert!(licenses[0].contains("NIB"));
+        assert!(licenses.is_empty());
     }
 }

@@ -106,7 +106,63 @@ impl LicenseRepository for PostgresLicenseRepositoryImpl {
 
     // Similar placeholders for the remaining methods
     async fn update_license(&self, license: &License) -> Result<License, sqlx::Error> {
-        Ok(license.clone())
+        let query = r#"
+            UPDATE licenses
+            SET
+                license_number = $1,
+                license_type = $2,
+                company_id = $3,
+                user_id = $4,
+                title = $5,
+                description = $6,
+                issue_date = $7,
+                expiry_date = $8,
+                issuing_authority = $9,
+                application_status = $10,
+                priority = $11,
+                estimated_processing_days = $12,
+                actual_processing_days = $13,
+                external_reference_id = $14,
+                government_fee = $15,
+                service_fee = $16,
+                updated_at = $17,
+                submitted_at = $18,
+                approved_at = $19,
+                rejected_at = $20,
+                admin_notes = $21,
+                rejection_reason = $22
+            WHERE id = $23
+            RETURNING *
+        "#;
+
+        let updated = sqlx::query_as::<_, License>(query)
+            .bind(&license.license_number)
+            .bind(&license.license_type)
+            .bind(license.company_id)
+            .bind(license.user_id)
+            .bind(&license.title)
+            .bind(&license.description)
+            .bind(license.issue_date)
+            .bind(license.expiry_date)
+            .bind(&license.issuing_authority)
+            .bind(&license.application_status)
+            .bind(&license.priority)
+            .bind(license.estimated_processing_days)
+            .bind(license.actual_processing_days)
+            .bind(&license.external_reference_id)
+            .bind(license.government_fee)
+            .bind(license.service_fee)
+            .bind(license.updated_at)
+            .bind(license.submitted_at)
+            .bind(license.approved_at)
+            .bind(license.rejected_at)
+            .bind(&license.admin_notes)
+            .bind(&license.rejection_reason)
+            .bind(license.id)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(updated)
     }
 
     async fn delete_license(&self, _id: Uuid) -> Result<bool, sqlx::Error> {
@@ -127,16 +183,58 @@ impl LicenseRepository for PostgresLicenseRepositoryImpl {
         Ok(vec![])
     }
 
-    async fn get_expiring_licenses(&self, _days_ahead: i32) -> Result<Vec<License>, sqlx::Error> {
-        Ok(vec![])
+    async fn get_expiring_licenses(&self, days_ahead: i32) -> Result<Vec<License>, sqlx::Error> {
+        let query = r#"
+            SELECT * FROM licenses
+            WHERE expiry_date IS NOT NULL
+              AND expiry_date <= NOW() + ($1 || ' days')::INTERVAL
+            ORDER BY expiry_date ASC
+        "#;
+
+        let licenses = sqlx::query_as::<_, License>(query)
+            .bind(days_ahead)
+            .fetch_all(&self.pool)
+            .await?;
+
+        Ok(licenses)
     }
 
     async fn search_licenses(
         &self,
-        _query: &str,
-        _user_id: Option<Uuid>,
+        query: &str,
+        user_id: Option<Uuid>,
     ) -> Result<Vec<License>, sqlx::Error> {
-        Ok(vec![])
+        let like_query = format!("%{}%", query);
+
+        let sql = if user_id.is_some() {
+            r#"
+                SELECT * FROM licenses
+                WHERE user_id = $1
+                  AND (title ILIKE $2 OR license_number ILIKE $2)
+                ORDER BY created_at DESC
+            "#
+        } else {
+            r#"
+                SELECT * FROM licenses
+                WHERE title ILIKE $1 OR license_number ILIKE $1
+                ORDER BY created_at DESC
+            "#
+        };
+
+        let licenses = if let Some(uid) = user_id {
+            sqlx::query_as::<_, License>(sql)
+                .bind(uid)
+                .bind(&like_query)
+                .fetch_all(&self.pool)
+                .await?
+        } else {
+            sqlx::query_as::<_, License>(sql)
+                .bind(&like_query)
+                .fetch_all(&self.pool)
+                .await?
+        };
+
+        Ok(licenses)
     }
 
     async fn create_document(
@@ -266,20 +364,42 @@ impl LicenseRepository for PostgresLicenseRepositoryImpl {
     }
 
     async fn get_license_count_by_type(&self) -> Result<Vec<(LicenseType, i64)>, sqlx::Error> {
-        // Simplified placeholder implementation
-        Ok(vec![])
+        let rows = sqlx::query(
+            "SELECT license_type, COUNT(*) as count FROM licenses GROUP BY license_type",
+        )
+        .map(|row: sqlx::postgres::PgRow| (row.get("license_type"), row.get::<i64, _>("count")))
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows)
     }
 
     async fn get_license_count_by_status(
         &self,
     ) -> Result<Vec<(ApplicationStatus, i64)>, sqlx::Error> {
-        // Simplified placeholder implementation
-        Ok(vec![])
+        let rows = sqlx::query(
+            "SELECT application_status, COUNT(*) as count FROM licenses GROUP BY application_status",
+        )
+        .map(|row: sqlx::postgres::PgRow| {
+            (row.get("application_status"), row.get::<i64, _>("count"))
+        })
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows)
     }
 
     async fn get_processing_times(&self) -> Result<Vec<(LicenseType, f64)>, sqlx::Error> {
-        // Simplified placeholder implementation
-        Ok(vec![])
+        let rows = sqlx::query(
+            "SELECT license_type, AVG(actual_processing_days)::float AS avg_days FROM licenses WHERE actual_processing_days IS NOT NULL GROUP BY license_type",
+        )
+        .map(|row: sqlx::postgres::PgRow| {
+            (row.get("license_type"), row.get::<f64, _>("avg_days"))
+        })
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows)
     }
 }
 

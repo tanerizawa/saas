@@ -132,7 +132,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let license_repository: Arc<dyn LicenseRepository + Send + Sync> = match &cache_service {
         Some(cache) => {
             tracing::info!("🔄 Initializing cached license repository");
-            Arc::new(CachedLicenseRepository::new_with_cache(
+            Arc::new(CachedLicenseRepository::<CacheService>::new_with_cache(
                 db.pool().clone(),
                 Arc::new(cache.clone()),
             ))

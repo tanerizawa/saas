@@ -61,6 +61,10 @@ impl RateLimiterWrapper {
             None => Ok(()), // If n is 0, no need to check rate limit
         }
     }
+
+    pub async fn is_rate_limited(&self, _ip: std::net::IpAddr) -> bool {
+        self.check().is_err()
+    }
 }
 #[derive(Debug, Clone, Deserialize)]
 pub struct SmtpConfig {

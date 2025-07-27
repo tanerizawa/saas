@@ -6,3 +6,4 @@ pub mod infrastructure;
 pub mod middleware;
 pub mod services;
 pub mod shared;
+pub mod config;

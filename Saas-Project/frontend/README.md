@@ -20,6 +20,39 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Storybook
+
+This project uses [Storybook](https://storybook.js.org/) for component documentation and visual testing. To run Storybook:
+
+```bash
+npm run storybook
+```
+
+This will start Storybook on [http://localhost:6006](http://localhost:6006) (or another port if 6006 is in use).
+
+### Component Stories
+
+Component stories are located in the `src/stories` directory. Each story represents a component in different states or configurations. Stories help document components and enable visual testing.
+
+We have implemented stories for the following components:
+- Button - Basic action component with various styles and states
+- Input - Form input fields with different types and states
+- Select - Dropdown selection with single items and grouping
+- Dialog - Modal dialogs for various use cases like confirmations and forms
+- Tabs - Tabbed interface for content organization
+- Toast - Notification messages with actions and various positioning
+- Card - Content containers with headers, footers, and styling variations
+
+### Adding New Stories
+
+To create a new story for a component:
+
+1. Create a new file in `src/stories` named `[ComponentName].stories.tsx`
+2. Import your component and define stories for different states
+3. Use the Storybook UI to view and test your component
+
+For more detailed information on our Storybook implementation and best practices, see the [Storybook Guide](./docs/STORYBOOK.md).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

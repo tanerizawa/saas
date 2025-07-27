@@ -38,8 +38,8 @@ CREATE TABLE IF NOT EXISTS license_verifications (
 );
 
 -- Create indexes
-CREATE INDEX idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX idx_notifications_is_read ON notifications(is_read);
-CREATE INDEX idx_license_workflows_license_id ON license_workflows(license_id);
-CREATE INDEX idx_license_workflows_current_step ON license_workflows(current_step);
-CREATE INDEX idx_license_verifications_license_id ON license_verifications(license_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_license_workflows_license_id ON license_workflows(license_id);
+CREATE INDEX IF NOT EXISTS idx_license_workflows_current_step ON license_workflows(current_step);
+CREATE INDEX IF NOT EXISTS idx_license_verifications_license_id ON license_verifications(license_id);

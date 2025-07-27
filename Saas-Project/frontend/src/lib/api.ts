@@ -3,6 +3,9 @@
 
 import axios, { AxiosResponse, AxiosError } from "axios";
 
+// Import mock API if enabled
+import { mockAuthAPI, mockConfig } from "../mocks";
+
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1";
 
@@ -122,6 +125,16 @@ apiClient.interceptors.response.use(
 // Auth API functions
 export const authAPI = {
   register: async (data: RegisterRequest): Promise<RegisterResponse> => {
+    // Use mock API if enabled
+    if (mockConfig.enabled) {
+      try {
+        return await mockAuthAPI.register(data);
+      } catch (error) {
+        throw error;
+      }
+    }
+    
+    // Use real API
     const response = await apiClient.post<RegisterResponse>(
       "/auth/register",
       data
@@ -130,6 +143,23 @@ export const authAPI = {
   },
 
   login: async (data: LoginRequest): Promise<AuthResponse> => {
+    // Use mock API if enabled
+    if (mockConfig.enabled) {
+      try {
+        const mockResponse = await mockAuthAPI.login(data);
+        
+        // Store tokens and user data
+        localStorage.setItem("access_token", mockResponse.access_token);
+        localStorage.setItem("refresh_token", mockResponse.refresh_token);
+        localStorage.setItem("user", JSON.stringify(mockResponse.user));
+        
+        return mockResponse;
+      } catch (error) {
+        throw error;
+      }
+    }
+    
+    // Use real API
     const response = await apiClient.post<AuthResponse>("/auth/login", data);
 
     // Store tokens and user data
@@ -141,6 +171,22 @@ export const authAPI = {
   },
 
   logout: async (): Promise<void> => {
+    // Use mock API if enabled
+    if (mockConfig.enabled) {
+      try {
+        await mockAuthAPI.logout();
+      } catch (error) {
+        console.error("Mock logout error:", error);
+      }
+      
+      // Clear local storage
+      localStorage.removeItem("access_token");
+      localStorage.removeItem("refresh_token");
+      localStorage.removeItem("user");
+      return;
+    }
+    
+    // Use real API
     try {
       await apiClient.post("/auth/logout");
     } finally {

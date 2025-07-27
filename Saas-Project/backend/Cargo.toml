@@ -57,6 +57,9 @@ reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 # File Upload and Storage
 # Using axum's built-in multipart support instead of separate multipart crate
 mime = "0.3"
+mime_guess = "2.0"
+bytes = "1.5"
+tokio-util = { version = "0.7", features = ["io"] }
 
 # Environment
 env_logger = "0.10"
@@ -100,10 +103,6 @@ path = "src/main.rs"
 [[bin]]
 name = "migrate"
 path = "src/bin/migrate.rs"
-
-[[bench]]
-name = "user_repository_benchmarks"
-harness = false
 
 [profile.dev]
 debug = true

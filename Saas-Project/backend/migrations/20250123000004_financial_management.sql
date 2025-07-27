@@ -50,10 +50,10 @@ CREATE TABLE IF NOT EXISTS invoice_items (
 );
 
 -- Create indexes
-CREATE INDEX idx_financial_reports_company_id ON financial_reports(company_id);
-CREATE INDEX idx_financial_reports_period ON financial_reports(period_start, period_end);
-CREATE INDEX idx_financial_reports_status ON financial_reports(status);
-CREATE INDEX idx_invoices_company_id ON invoices(company_id);
-CREATE INDEX idx_invoices_status ON invoices(status);
-CREATE INDEX idx_invoices_dates ON invoices(invoice_date, due_date);
-CREATE INDEX idx_invoice_items_invoice_id ON invoice_items(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_financial_reports_company_id ON financial_reports(company_id);
+CREATE INDEX IF NOT EXISTS idx_financial_reports_period ON financial_reports(period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_financial_reports_status ON financial_reports(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_company_id ON invoices(company_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
+CREATE INDEX IF NOT EXISTS idx_invoices_dates ON invoices(invoice_date, due_date);
+CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice_id ON invoice_items(invoice_id);

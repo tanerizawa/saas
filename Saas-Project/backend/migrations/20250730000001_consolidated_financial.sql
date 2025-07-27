@@ -83,29 +83,46 @@ CREATE INDEX IF NOT EXISTS idx_financial_reports_company_id ON financial_reports
 CREATE INDEX IF NOT EXISTS idx_financial_reports_report_type ON financial_reports(report_type);
 CREATE INDEX IF NOT EXISTS idx_financial_reports_period ON financial_reports(period_start, period_end);
 
--- Invoices for payment tracking
-CREATE TABLE IF NOT EXISTS invoices (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
-    invoice_number VARCHAR(50) NOT NULL,
-    client_name VARCHAR(255) NOT NULL,
-    client_email VARCHAR(255) NOT NULL,
-    client_address TEXT,
-    issue_date DATE NOT NULL,
-    due_date DATE NOT NULL,
-    subtotal DECIMAL(14, 2) NOT NULL,
-    tax_amount DECIMAL(14, 2) NOT NULL DEFAULT 0,
-    discount_amount DECIMAL(14, 2) NOT NULL DEFAULT 0,
-    total_amount DECIMAL(14, 2) NOT NULL,
-    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
-    status VARCHAR(50) NOT NULL DEFAULT 'draft',
-    notes TEXT,
-    created_by UUID REFERENCES users(id),
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    sent_at TIMESTAMP WITH TIME ZONE,
-    paid_at TIMESTAMP WITH TIME ZONE
-);
+-- Update existing invoices table to add missing columns
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'client_name') THEN
+        ALTER TABLE invoices ADD COLUMN client_name VARCHAR(255) DEFAULT '';
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'client_email') THEN
+        ALTER TABLE invoices ADD COLUMN client_email VARCHAR(255) DEFAULT '';
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'client_address') THEN
+        ALTER TABLE invoices ADD COLUMN client_address TEXT DEFAULT '';
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'issue_date') THEN
+        ALTER TABLE invoices ADD COLUMN issue_date DATE DEFAULT CURRENT_DATE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'subtotal') THEN
+        ALTER TABLE invoices ADD COLUMN subtotal DECIMAL(14, 2) DEFAULT 0;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'discount_amount') THEN
+        ALTER TABLE invoices ADD COLUMN discount_amount DECIMAL(14, 2) DEFAULT 0;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'notes') THEN
+        ALTER TABLE invoices ADD COLUMN notes TEXT DEFAULT '';
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'created_by') THEN
+        ALTER TABLE invoices ADD COLUMN created_by UUID REFERENCES users(id);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoices' AND column_name = 'sent_at') THEN
+        ALTER TABLE invoices ADD COLUMN sent_at TIMESTAMP WITH TIME ZONE;
+    END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_invoices_company_id ON invoices(company_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_invoice_number ON invoices(invoice_number);
@@ -113,38 +130,45 @@ CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_due_date ON invoices(due_date);
 CREATE INDEX IF NOT EXISTS idx_invoices_client_name ON invoices(client_name);
 
--- Invoice items for detailed billing
-CREATE TABLE IF NOT EXISTS invoice_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-    item_name VARCHAR(255) NOT NULL,
-    description TEXT,
-    quantity DECIMAL(10, 2) NOT NULL,
-    unit_price DECIMAL(14, 2) NOT NULL,
-    tax_rate DECIMAL(5, 2) NOT NULL DEFAULT 0,
-    discount_rate DECIMAL(5, 2) NOT NULL DEFAULT 0,
-    total_price DECIMAL(14, 2) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
+-- Update existing invoice_items table to add missing columns
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoice_items' AND column_name = 'item_name') THEN
+        ALTER TABLE invoice_items ADD COLUMN item_name VARCHAR(255) DEFAULT '';
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoice_items' AND column_name = 'discount_rate') THEN
+        ALTER TABLE invoice_items ADD COLUMN discount_rate DECIMAL(5, 2) DEFAULT 0;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'invoice_items' AND column_name = 'updated_at') THEN
+        ALTER TABLE invoice_items ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW();
+    END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice_id ON invoice_items(invoice_id);
 
--- Payments for tracking money received
-CREATE TABLE IF NOT EXISTS payments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    invoice_id UUID NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
-    payment_method VARCHAR(50) NOT NULL,
-    amount DECIMAL(14, 2) NOT NULL,
-    currency VARCHAR(3) NOT NULL DEFAULT 'USD',
-    payment_date TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    payment_reference VARCHAR(255),
-    notes TEXT,
-    status VARCHAR(50) NOT NULL DEFAULT 'completed',
-    created_by UUID REFERENCES users(id),
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
+-- Update existing payments table to add missing columns
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payments' AND column_name = 'invoice_id') THEN
+        ALTER TABLE payments ADD COLUMN invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payments' AND column_name = 'payment_reference') THEN
+        ALTER TABLE payments ADD COLUMN payment_reference VARCHAR(255);
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payments' AND column_name = 'notes') THEN
+        ALTER TABLE payments ADD COLUMN notes TEXT;
+    END IF;
+    
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'payments' AND column_name = 'created_by') THEN
+        ALTER TABLE payments ADD COLUMN created_by UUID REFERENCES users(id);
+    END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_payments_invoice_id ON payments(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_payments_payment_date ON payments(payment_date);

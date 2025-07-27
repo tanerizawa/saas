@@ -1,8 +1,7 @@
 use async_trait::async_trait;
-use sqlx::{PgPool, Postgres, QueryBuilder};
-use uuid::Uuid;
-use chrono::{DateTime, Utc};
+use sqlx::{PgPool, Postgres, QueryBuilder, Row};
 use std::sync::Arc;
+use uuid::Uuid;
 
 use crate::infrastructure::web::handlers::files::StoredFile;
 use crate::shared::errors::AppError;
@@ -11,10 +10,10 @@ use crate::shared::errors::AppError;
 pub trait FileRepository: Send + Sync {
     /// Save file metadata to the database
     async fn save_file(&self, file: &StoredFile) -> Result<StoredFile, AppError>;
-    
+
     /// Find file by ID
     async fn find_by_id(&self, file_id: &Uuid) -> Result<Option<StoredFile>, AppError>;
-    
+
     /// Find files by user ID with optional pagination and filtering
     async fn find_by_user_id(
         &self,
@@ -23,10 +22,10 @@ pub trait FileRepository: Send + Sync {
         limit: u32,
         category: Option<&str>,
     ) -> Result<Vec<StoredFile>, AppError>;
-    
+
     /// Delete a file by ID
     async fn delete_by_id(&self, file_id: &Uuid) -> Result<bool, AppError>;
-    
+
     /// Count files for a user
     async fn count_by_user_id(
         &self,
@@ -49,28 +48,33 @@ impl PgFileRepository {
 #[async_trait]
 impl FileRepository for PgFileRepository {
     async fn save_file(&self, file: &StoredFile) -> Result<StoredFile, AppError> {
-        let result = sqlx::query_as!(
-            StoredFile,
+        let result = sqlx::query_as::<_, StoredFile>(
             r#"
             INSERT INTO files (
-                id, original_filename, storage_filename, content_type,
-                size_bytes, file_path, uploaded_by, uploaded_at, category
+                id, filename, original_filename, content_type, size_bytes,
+                path, user_id, uploaded_at, is_public,
+                storage_filename, file_path, uploaded_by, category
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING 
-                id, original_filename, storage_filename, content_type,
-                size_bytes, file_path, uploaded_by, uploaded_at, category
+                id, filename, original_filename, content_type, size_bytes,
+                path, user_id, uploaded_at, last_accessed_at, is_public,
+                storage_filename, file_path, uploaded_by, category
             "#,
-            file.id,
-            file.original_filename,
-            file.storage_filename,
-            file.content_type,
-            file.size_bytes,
-            file.file_path,
-            file.uploaded_by,
-            file.uploaded_at,
-            file.category
         )
+        .bind(&file.id)
+        .bind(&file.filename)
+        .bind(&file.original_filename)
+        .bind(&file.content_type)
+        .bind(&file.size_bytes)
+        .bind(&file.path)
+        .bind(&file.user_id)
+        .bind(&file.uploaded_at)
+        .bind(&file.is_public)
+        .bind(&file.storage_filename)
+        .bind(&file.file_path)
+        .bind(&file.uploaded_by)
+        .bind(&file.category)
         .fetch_one(&*self.pool)
         .await
         .map_err(|e| AppError::InternalError(e.to_string()))?;
@@ -79,17 +83,17 @@ impl FileRepository for PgFileRepository {
     }
 
     async fn find_by_id(&self, file_id: &Uuid) -> Result<Option<StoredFile>, AppError> {
-        let result = sqlx::query_as!(
-            StoredFile,
+        let result = sqlx::query_as::<_, StoredFile>(
             r#"
             SELECT 
-                id, original_filename, storage_filename, content_type,
-                size_bytes, file_path, uploaded_by, uploaded_at, category
+                id, filename, original_filename, content_type, size_bytes,
+                path, user_id, uploaded_at, last_accessed_at, is_public,
+                storage_filename, file_path, uploaded_by, category
             FROM files
             WHERE id = $1
             "#,
-            file_id
         )
+        .bind(file_id)
         .fetch_optional(&*self.pool)
         .await
         .map_err(|e| AppError::InternalError(e.to_string()))?;
@@ -105,40 +109,40 @@ impl FileRepository for PgFileRepository {
         category: Option<&str>,
     ) -> Result<Vec<StoredFile>, AppError> {
         let offset = (page - 1) * limit;
-        
+
         let mut query_builder: QueryBuilder<Postgres> = QueryBuilder::new(
-            "SELECT id, original_filename, storage_filename, content_type, size_bytes, file_path, uploaded_by, uploaded_at, category FROM files WHERE uploaded_by = "
+            "SELECT id, filename, original_filename, content_type, size_bytes, path, user_id, uploaded_at, last_accessed_at, is_public, storage_filename, file_path, uploaded_by, category FROM files WHERE user_id = "
         );
-        
+
         query_builder.push_bind(user_id);
-        
+
         if let Some(cat) = category {
             query_builder.push(" AND category = ");
             query_builder.push_bind(cat);
         }
-        
+
         query_builder.push(" ORDER BY uploaded_at DESC LIMIT ");
         query_builder.push_bind(limit as i64);
         query_builder.push(" OFFSET ");
         query_builder.push_bind(offset as i64);
-        
+
         let result = query_builder
             .build_query_as::<StoredFile>()
             .fetch_all(&*self.pool)
             .await
             .map_err(|e| AppError::InternalError(e.to_string()))?;
-            
+
         Ok(result)
     }
 
     async fn delete_by_id(&self, file_id: &Uuid) -> Result<bool, AppError> {
-        let result = sqlx::query!(
+        let result = sqlx::query(
             r#"
             DELETE FROM files
             WHERE id = $1
             "#,
-            file_id
         )
+        .bind(file_id)
         .execute(&*self.pool)
         .await
         .map_err(|e| AppError::InternalError(e.to_string()))?;
@@ -152,34 +156,36 @@ impl FileRepository for PgFileRepository {
         category: Option<&str>,
     ) -> Result<i64, AppError> {
         if let Some(cat) = category {
-            let result = sqlx::query!(
+            let result = sqlx::query(
                 r#"
                 SELECT COUNT(*) as count
                 FROM files
-                WHERE uploaded_by = $1 AND category = $2
+                WHERE user_id = $1 AND category = $2
                 "#,
-                user_id,
-                cat
             )
+            .bind(user_id)
+            .bind(cat)
             .fetch_one(&*self.pool)
             .await
             .map_err(|e| AppError::InternalError(e.to_string()))?;
 
-            Ok(result.count.unwrap_or(0))
+            let count: i64 = result.get("count");
+            Ok(count)
         } else {
-            let result = sqlx::query!(
+            let result = sqlx::query(
                 r#"
                 SELECT COUNT(*) as count
                 FROM files
-                WHERE uploaded_by = $1
+                WHERE user_id = $1
                 "#,
-                user_id
             )
+            .bind(user_id)
             .fetch_one(&*self.pool)
             .await
             .map_err(|e| AppError::InternalError(e.to_string()))?;
 
-            Ok(result.count.unwrap_or(0))
+            let count: i64 = result.get("count");
+            Ok(count)
         }
     }
 }
@@ -202,7 +208,7 @@ impl FileRepository for MockFileRepository {
     }
 
     async fn find_by_id(&self, file_id: &Uuid) -> Result<Option<StoredFile>, AppError> {
-        let file = self.files.iter().find(|f| &f.id == file_id).cloned();
+        let file = self.files.iter().find(|f| f.id == *file_id).cloned();
         Ok(file)
     }
 
@@ -214,9 +220,10 @@ impl FileRepository for MockFileRepository {
         category: Option<&str>,
     ) -> Result<Vec<StoredFile>, AppError> {
         let offset = (page - 1) * limit;
-        let mut files: Vec<StoredFile> = self.files
+        let mut files: Vec<StoredFile> = self
+            .files
             .iter()
-            .filter(|f| &f.uploaded_by == user_id)
+            .filter(|f| f.user_id == *user_id)
             .filter(|f| {
                 if let Some(cat) = category {
                     if let Some(file_cat) = &f.category {
@@ -230,16 +237,16 @@ impl FileRepository for MockFileRepository {
             })
             .cloned()
             .collect();
-        
+
         files.sort_by(|a, b| b.uploaded_at.cmp(&a.uploaded_at));
-        
+
         let end = (offset as usize + limit as usize).min(files.len());
         let start = offset as usize;
-        
+
         if start >= files.len() {
             return Ok(Vec::new());
         }
-        
+
         Ok(files[start..end].to_vec())
     }
 
@@ -252,9 +259,10 @@ impl FileRepository for MockFileRepository {
         user_id: &Uuid,
         category: Option<&str>,
     ) -> Result<i64, AppError> {
-        let count = self.files
+        let count = self
+            .files
             .iter()
-            .filter(|f| &f.uploaded_by == user_id)
+            .filter(|f| f.user_id == *user_id)
             .filter(|f| {
                 if let Some(cat) = category {
                     if let Some(file_cat) = &f.category {
@@ -267,7 +275,7 @@ impl FileRepository for MockFileRepository {
                 }
             })
             .count();
-            
+
         Ok(count as i64)
     }
 }

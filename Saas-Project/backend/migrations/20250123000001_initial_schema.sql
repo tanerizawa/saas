@@ -87,12 +87,12 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 -- Create indexes for better performance
-CREATE INDEX idx_users_email ON users(email);
-CREATE INDEX idx_companies_name ON companies(name);
-CREATE INDEX idx_companies_status ON companies(status);
-CREATE INDEX idx_licenses_company_id ON licenses(company_id);
-CREATE INDEX idx_licenses_status ON licenses(status);
-CREATE INDEX idx_documents_owner ON documents(owner_id, owner_type);
-CREATE INDEX idx_payments_user_id ON payments(user_id);
-CREATE INDEX idx_payments_related ON payments(related_id, related_type);
-CREATE INDEX idx_payments_status ON payments(status);
+CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_companies_name ON companies(name);
+CREATE INDEX IF NOT EXISTS idx_companies_status ON companies(status);
+CREATE INDEX IF NOT EXISTS idx_licenses_company_id ON licenses(company_id);
+CREATE INDEX IF NOT EXISTS idx_licenses_status ON licenses(status);
+CREATE INDEX IF NOT EXISTS idx_documents_owner ON documents(owner_id, owner_type);
+CREATE INDEX IF NOT EXISTS idx_payments_user_id ON payments(user_id);
+CREATE INDEX IF NOT EXISTS idx_payments_related ON payments(related_id, related_type);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);

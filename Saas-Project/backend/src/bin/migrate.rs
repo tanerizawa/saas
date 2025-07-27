@@ -114,7 +114,8 @@ async fn show_status(database_url: &str) -> Result<(), Box<dyn std::error::Error
     
     // Display migration status
     for file in &migration_files {
-        let file_name = file.file_name().to_string_lossy();
+        // Convert OsString to an owned String to avoid borrowing a temporary
+        let file_name = file.file_name().to_string_lossy().into_owned();
         
         if !file_name.contains("_") {
             continue;

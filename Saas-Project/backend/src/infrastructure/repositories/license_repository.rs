@@ -9,6 +9,7 @@ use uuid::Uuid;
 use crate::domain::licenses::{
     ApplicationStatus, ApplicationStatusHistory, License, LicenseDocument, LicenseType,
 };
+use crate::domain::dto::LicenseDto;
 
 // Import LicenseRepository trait from cached_license_repository.rs
 use super::cached_license_repository::LicenseRepository;
@@ -28,7 +29,7 @@ impl LicenseRepository for PostgresLicenseRepositoryImpl {
     async fn create_license(&self, license: &License) -> Result<License, sqlx::Error> {
         let query = r#"
             INSERT INTO licenses (
-                id, license_number, license_type, company_id, user_id, 
+                id, license_number, license_type, company_id, user_id,
                 title, description, issue_date, expiry_date, issuing_authority,
                 application_status, priority, estimated_processing_days, actual_processing_days,
                 external_reference_id, government_fee, service_fee, created_at, updated_at,
@@ -39,41 +40,47 @@ impl LicenseRepository for PostgresLicenseRepositoryImpl {
             ) RETURNING *
         "#;
 
-        Ok(sqlx::query_as::<_, License>(query)
-            .bind(license.id)
-            .bind(&license.license_number)
-            .bind(&license.license_type)
-            .bind(license.company_id)
-            .bind(license.user_id)
-            .bind(&license.title)
-            .bind(&license.description)
-            .bind(license.issue_date)
-            .bind(license.expiry_date)
-            .bind(&license.issuing_authority)
-            .bind(&license.application_status)
-            .bind(&license.priority)
-            .bind(license.estimated_processing_days)
-            .bind(license.actual_processing_days)
-            .bind(&license.external_reference_id)
-            .bind(license.government_fee)
-            .bind(license.service_fee)
-            .bind(license.created_at)
-            .bind(license.updated_at)
-            .bind(license.submitted_at)
-            .bind(license.approved_at)
-            .bind(license.rejected_at)
-            .bind(&license.admin_notes)
-            .bind(&license.rejection_reason)
+        let dto: LicenseDto = license.clone().into();
+
+        let inserted: LicenseDto = sqlx::query_as(query)
+            .bind(dto.id)
+            .bind(&dto.license_number)
+            .bind(dto.license_type)
+            .bind(dto.company_id)
+            .bind(dto.user_id)
+            .bind(&dto.title)
+            .bind(&dto.description)
+            .bind(dto.issue_date)
+            .bind(dto.expiry_date)
+            .bind(&dto.issuing_authority)
+            .bind(dto.application_status)
+            .bind(dto.priority)
+            .bind(dto.estimated_processing_days)
+            .bind(dto.actual_processing_days)
+            .bind(&dto.external_reference_id)
+            .bind(dto.government_fee)
+            .bind(dto.service_fee)
+            .bind(dto.created_at)
+            .bind(dto.updated_at)
+            .bind(dto.submitted_at)
+            .bind(dto.approved_at)
+            .bind(dto.rejected_at)
+            .bind(&dto.admin_notes)
+            .bind(&dto.rejection_reason)
             .fetch_one(&self.pool)
-            .await?)
+            .await?;
+
+        Ok(inserted.into())
     }
 
     async fn get_license_by_id(&self, id: Uuid) -> Result<Option<License>, sqlx::Error> {
         let query = "SELECT * FROM licenses WHERE id = $1";
-        Ok(sqlx::query_as::<_, License>(query)
+        let dto = sqlx::query_as::<_, LicenseDto>(query)
             .bind(id)
             .fetch_optional(&self.pool)
-            .await?)
+            .await?;
+
+        Ok(dto.map(|d| d.into()))
     }
 
     async fn get_licenses_by_user(&self, user_id: Uuid) -> Result<Vec<License>, sqlx::Error> {
@@ -83,10 +90,12 @@ impl LicenseRepository for PostgresLicenseRepositoryImpl {
             ORDER BY created_at DESC
         "#;
 
-        Ok(sqlx::query_as::<_, License>(query)
+        let rows = sqlx::query_as::<_, LicenseDto>(query)
             .bind(user_id)
             .fetch_all(&self.pool)
-            .await?)
+            .await?;
+
+        Ok(rows.into_iter().map(|d| d.into()).collect())
     }
     async fn get_licenses_by_company(&self, company_id: Uuid) -> Result<Vec<License>, sqlx::Error> {
         let query = r#"
@@ -95,10 +104,12 @@ impl LicenseRepository for PostgresLicenseRepositoryImpl {
             ORDER BY created_at DESC
         "#;
 
-        Ok(sqlx::query_as::<_, License>(query)
+        let rows = sqlx::query_as::<_, LicenseDto>(query)
             .bind(company_id)
             .fetch_all(&self.pool)
-            .await?)
+            .await?;
+
+        Ok(rows.into_iter().map(|d| d.into()).collect())
     }
 
     // For the rest of the implementation, let's keep the original code...
@@ -135,52 +146,73 @@ impl LicenseRepository for PostgresLicenseRepositoryImpl {
             RETURNING *
         "#;
 
-        let updated = sqlx::query_as::<_, License>(query)
-            .bind(&license.license_number)
-            .bind(&license.license_type)
-            .bind(license.company_id)
-            .bind(license.user_id)
-            .bind(&license.title)
-            .bind(&license.description)
-            .bind(license.issue_date)
-            .bind(license.expiry_date)
-            .bind(&license.issuing_authority)
-            .bind(&license.application_status)
-            .bind(&license.priority)
-            .bind(license.estimated_processing_days)
-            .bind(license.actual_processing_days)
-            .bind(&license.external_reference_id)
-            .bind(license.government_fee)
-            .bind(license.service_fee)
-            .bind(license.updated_at)
-            .bind(license.submitted_at)
-            .bind(license.approved_at)
-            .bind(license.rejected_at)
-            .bind(&license.admin_notes)
-            .bind(&license.rejection_reason)
-            .bind(license.id)
+        let dto: LicenseDto = license.clone().into();
+
+        let updated: LicenseDto = sqlx::query_as(query)
+            .bind(&dto.license_number)
+            .bind(dto.license_type)
+            .bind(dto.company_id)
+            .bind(dto.user_id)
+            .bind(&dto.title)
+            .bind(&dto.description)
+            .bind(dto.issue_date)
+            .bind(dto.expiry_date)
+            .bind(&dto.issuing_authority)
+            .bind(dto.application_status)
+            .bind(dto.priority)
+            .bind(dto.estimated_processing_days)
+            .bind(dto.actual_processing_days)
+            .bind(&dto.external_reference_id)
+            .bind(dto.government_fee)
+            .bind(dto.service_fee)
+            .bind(dto.updated_at)
+            .bind(dto.submitted_at)
+            .bind(dto.approved_at)
+            .bind(dto.rejected_at)
+            .bind(&dto.admin_notes)
+            .bind(&dto.rejection_reason)
+            .bind(dto.id)
             .fetch_one(&self.pool)
             .await?;
 
-        Ok(updated)
+        Ok(updated.into())
     }
 
-    async fn delete_license(&self, _id: Uuid) -> Result<bool, sqlx::Error> {
-        Ok(true)
+    async fn delete_license(&self, id: Uuid) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM licenses WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(result.rows_affected() > 0)
     }
 
     async fn get_licenses_by_status(
         &self,
-        _status: ApplicationStatus,
+        status: ApplicationStatus,
     ) -> Result<Vec<License>, sqlx::Error> {
-        Ok(vec![])
+        let rows = sqlx::query_as::<_, LicenseDto>(
+            "SELECT * FROM licenses WHERE application_status = $1 ORDER BY created_at DESC",
+        )
+        .bind(status)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(|d| d.into()).collect())
     }
 
     async fn get_licenses_by_type(
         &self,
-        _license_type: LicenseType,
+        license_type: LicenseType,
     ) -> Result<Vec<License>, sqlx::Error> {
-        Ok(vec![])
+        let rows = sqlx::query_as::<_, LicenseDto>(
+            "SELECT * FROM licenses WHERE license_type = $1 ORDER BY created_at DESC",
+        )
+        .bind(license_type)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows.into_iter().map(|d| d.into()).collect())
     }
 
     async fn get_expiring_licenses(&self, days_ahead: i32) -> Result<Vec<License>, sqlx::Error> {
@@ -221,95 +253,260 @@ impl LicenseRepository for PostgresLicenseRepositoryImpl {
             "#
         };
 
-        let licenses = if let Some(uid) = user_id {
-            sqlx::query_as::<_, License>(sql)
+        let rows = if let Some(uid) = user_id {
+            sqlx::query_as::<_, LicenseDto>(sql)
                 .bind(uid)
                 .bind(&like_query)
                 .fetch_all(&self.pool)
                 .await?
         } else {
-            sqlx::query_as::<_, License>(sql)
+            sqlx::query_as::<_, LicenseDto>(sql)
                 .bind(&like_query)
                 .fetch_all(&self.pool)
                 .await?
         };
 
-        Ok(licenses)
+        Ok(rows.into_iter().map(|d| d.into()).collect())
     }
 
     async fn create_document(
         &self,
         document: &LicenseDocument,
     ) -> Result<LicenseDocument, sqlx::Error> {
-        Ok(document.clone())
+        let query = r#"
+            INSERT INTO license_documents (
+                id, license_id, document_type, file_name, original_file_name,
+                file_path, file_size, mime_type, upload_date, is_verified,
+                verified_at, verified_by, notes
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13
+            ) RETURNING *
+        "#;
+
+        let inserted = sqlx::query_as::<_, LicenseDocument>(query)
+            .bind(document.id)
+            .bind(document.license_id)
+            .bind(&document.document_type)
+            .bind(&document.file_name)
+            .bind(&document.original_file_name)
+            .bind(&document.file_path)
+            .bind(document.file_size)
+            .bind(&document.mime_type)
+            .bind(document.upload_date)
+            .bind(document.is_verified)
+            .bind(document.verified_at)
+            .bind(document.verified_by)
+            .bind(&document.notes)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(inserted)
     }
 
     async fn get_documents_by_license(
         &self,
-        _license_id: Uuid,
+        license_id: Uuid,
     ) -> Result<Vec<LicenseDocument>, sqlx::Error> {
-        Ok(vec![])
+        let rows = sqlx::query_as::<_, LicenseDocument>(
+            "SELECT * FROM license_documents WHERE license_id = $1 ORDER BY upload_date ASC",
+        )
+        .bind(license_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows)
     }
 
-    async fn get_document_by_id(&self, _id: Uuid) -> Result<Option<LicenseDocument>, sqlx::Error> {
-        Ok(None)
+    async fn get_document_by_id(&self, id: Uuid) -> Result<Option<LicenseDocument>, sqlx::Error> {
+        let row = sqlx::query_as::<_, LicenseDocument>(
+            "SELECT * FROM license_documents WHERE id = $1",
+        )
+        .bind(id)
+        .fetch_optional(&self.pool)
+        .await?;
+
+        Ok(row)
     }
 
     async fn update_document(
         &self,
         document: &LicenseDocument,
     ) -> Result<LicenseDocument, sqlx::Error> {
-        Ok(document.clone())
+        let query = r#"
+            UPDATE license_documents
+            SET
+                document_type = $1,
+                file_name = $2,
+                original_file_name = $3,
+                file_path = $4,
+                file_size = $5,
+                mime_type = $6,
+                upload_date = $7,
+                is_verified = $8,
+                verified_at = $9,
+                verified_by = $10,
+                notes = $11
+            WHERE id = $12
+            RETURNING *
+        "#;
+
+        let updated = sqlx::query_as::<_, LicenseDocument>(query)
+            .bind(&document.document_type)
+            .bind(&document.file_name)
+            .bind(&document.original_file_name)
+            .bind(&document.file_path)
+            .bind(document.file_size)
+            .bind(&document.mime_type)
+            .bind(document.upload_date)
+            .bind(document.is_verified)
+            .bind(document.verified_at)
+            .bind(document.verified_by)
+            .bind(&document.notes)
+            .bind(document.id)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(updated)
     }
 
-    async fn delete_document(&self, _id: Uuid) -> Result<bool, sqlx::Error> {
-        Ok(true)
+    async fn delete_document(&self, id: Uuid) -> Result<bool, sqlx::Error> {
+        let result = sqlx::query("DELETE FROM license_documents WHERE id = $1")
+            .bind(id)
+            .execute(&self.pool)
+            .await?;
+
+        Ok(result.rows_affected() > 0)
     }
 
     async fn create_status_history(
         &self,
         history: &ApplicationStatusHistory,
     ) -> Result<ApplicationStatusHistory, sqlx::Error> {
-        Ok(history.clone())
+        let query = r#"
+            INSERT INTO application_status_history (
+                id, license_id, from_status, to_status, changed_by,
+                changed_at, notes, is_system_generated
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8
+            ) RETURNING *
+        "#;
+
+        let inserted = sqlx::query_as::<_, ApplicationStatusHistory>(query)
+            .bind(history.id)
+            .bind(history.license_id)
+            .bind(history.from_status)
+            .bind(history.to_status)
+            .bind(history.changed_by)
+            .bind(history.changed_at)
+            .bind(&history.notes)
+            .bind(history.is_system_generated)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(inserted)
     }
 
     async fn get_status_history_by_license(
         &self,
-        _license_id: Uuid,
+        license_id: Uuid,
     ) -> Result<Vec<ApplicationStatusHistory>, sqlx::Error> {
-        Ok(vec![])
+        let rows = sqlx::query_as::<_, ApplicationStatusHistory>(
+            "SELECT * FROM application_status_history WHERE license_id = $1 ORDER BY changed_at ASC",
+        )
+        .bind(license_id)
+        .fetch_all(&self.pool)
+        .await?;
+
+        Ok(rows)
     }
 
     async fn submit_license_application(
         &self,
-        _license_id: Uuid,
-        _user_id: Uuid,
+        license_id: Uuid,
+        user_id: Uuid,
     ) -> Result<License, sqlx::Error> {
-        // Placeholder implementation
-        Err(sqlx::Error::RowNotFound)
+        let query = r#"
+            UPDATE licenses
+            SET application_status = 'submitted',
+                submitted_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $1 AND user_id = $2
+            RETURNING *
+        "#;
+
+        let dto: LicenseDto = sqlx::query_as(query)
+            .bind(license_id)
+            .bind(user_id)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(dto.into())
     }
 
     async fn approve_license(
         &self,
-        _license_id: Uuid,
+        license_id: Uuid,
         _admin_user_id: Uuid,
-        _license_number: String,
-        _issue_date: DateTime<Utc>,
-        _expiry_date: Option<DateTime<Utc>>,
-        _issuing_authority: String,
-        _admin_notes: Option<String>,
+        license_number: String,
+        issue_date: DateTime<Utc>,
+        expiry_date: Option<DateTime<Utc>>,
+        issuing_authority: String,
+        admin_notes: Option<String>,
     ) -> Result<License, sqlx::Error> {
-        Err(sqlx::Error::RowNotFound)
+        let query = r#"
+            UPDATE licenses
+            SET application_status = 'approved',
+                license_number = $2,
+                issue_date = $3,
+                expiry_date = $4,
+                issuing_authority = $5,
+                admin_notes = $6,
+                approved_at = NOW(),
+                updated_at = NOW(),
+                actual_processing_days = CASE WHEN submitted_at IS NOT NULL THEN EXTRACT(DAY FROM (NOW() - submitted_at))::INT END
+            WHERE id = $1
+            RETURNING *
+        "#;
+
+        let dto: LicenseDto = sqlx::query_as(query)
+            .bind(license_id)
+            .bind(&license_number)
+            .bind(issue_date)
+            .bind(expiry_date)
+            .bind(&issuing_authority)
+            .bind(&admin_notes)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(dto.into())
     }
 
     async fn reject_license(
         &self,
-        _license_id: Uuid,
+        license_id: Uuid,
         _admin_user_id: Uuid,
-        _reason: String,
-        _admin_notes: Option<String>,
+        reason: String,
+        admin_notes: Option<String>,
     ) -> Result<License, sqlx::Error> {
-        Err(sqlx::Error::RowNotFound)
+        let query = r#"
+            UPDATE licenses
+            SET application_status = 'rejected',
+                rejection_reason = $2,
+                admin_notes = $3,
+                rejected_at = NOW(),
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+        "#;
+
+        let dto: LicenseDto = sqlx::query_as(query)
+            .bind(license_id)
+            .bind(&reason)
+            .bind(&admin_notes)
+            .fetch_one(&self.pool)
+            .await?;
+
+        Ok(dto.into())
     }
 
     async fn get_license_statistics(

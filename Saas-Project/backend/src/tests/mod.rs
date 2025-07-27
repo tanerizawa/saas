@@ -11,3 +11,4 @@ mod api_test;
 mod mocks;
 mod user_repository_proptest;
 mod refresh_token_test;
+mod license_repository_test;

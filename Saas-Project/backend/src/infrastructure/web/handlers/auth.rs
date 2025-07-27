@@ -251,10 +251,10 @@ pub async fn get_profile(
     Ok(Json(response))
 }
 pub async fn refresh_token(
-    State(_state): State<AppState>,
+    State(state): State<AppState>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let _refresh_token = payload
+    let refresh_token = payload
         .get("refresh_token")
         .and_then(|v| v.as_str())
         .ok_or_else(|| {
@@ -264,13 +264,69 @@ pub async fn refresh_token(
             )
         })?;
 
-    // TODO: Implement refresh token logic
-    // For now, return a not implemented error
-    Err((
-        StatusCode::NOT_IMPLEMENTED,
-        Json(json!({"error": "Refresh token functionality not yet implemented"})),
-    ))
-}/// Logout endpoint
+    // Validate refresh token
+    let claims = state
+        .auth_service()
+        .validate_token(refresh_token)
+        .map_err(|_| {
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error": "Invalid refresh token"})),
+            )
+        })?;
+
+    let user_id = uuid::Uuid::parse_str(&claims.sub)
+        .map(crate::domain::value_objects::UserId)
+        .map_err(|_| {
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error": "Invalid refresh token"})),
+            )
+        })?;
+
+    let user = state
+        .user_repository()
+        .find_by_id(&user_id)
+        .await
+        .map_err(|err| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Database error", "details": err.to_string()})),
+            )
+        })?
+        .ok_or_else(|| {
+            (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({"error": "Invalid refresh token"})),
+            )
+        })?;
+
+    let tokens = state
+        .auth_service()
+        .generate_tokens(&user)
+        .map_err(|err| {
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(json!({"error": "Failed to generate tokens", "details": err.to_string()})),
+            )
+        })?;
+
+    if let Some(cache) = state.cache_service() {
+        if let Ok(new_claims) = state.auth_service().validate_token(&tokens.refresh_token) {
+            let ttl = new_claims.exp - chrono::Utc::now().timestamp();
+            let key = format!("refresh:{}:{}", user_id, new_claims.jti);
+            let _ = cache.set(&key, &tokens.refresh_token, Some(ttl as u64)).await;
+        }
+    }
+
+    Ok(Json(json!({
+        "access_token": tokens.access_token,
+        "refresh_token": tokens.refresh_token,
+        "expires_at": tokens.expires_at,
+    })))
+}
+
+/// Logout endpoint
 pub async fn logout(
     State(state): State<AppState>,
     auth_user: crate::infrastructure::web::middleware::auth::AuthenticatedUser,

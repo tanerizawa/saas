@@ -16,6 +16,51 @@ use crate::infrastructure::repositories::license_repository::LicenseStatistics;
 use crate::infrastructure::cache::CacheService;
 
 #[async_trait]
+pub trait Cache: Send + Sync {
+    async fn set<T: serde::Serialize + Send + Sync>(
+        &self,
+        key: &str,
+        value: &T,
+        expiry_secs: Option<u64>,
+    ) -> Result<(), redis::RedisError>;
+
+    async fn get<T: serde::de::DeserializeOwned + Send + Sync>(
+        &self,
+        key: &str,
+    ) -> Result<Option<T>, redis::RedisError>;
+
+    async fn delete(&self, key: &str) -> Result<(), redis::RedisError>;
+    async fn delete_by_pattern(&self, pattern: &str) -> Result<(), redis::RedisError>;
+}
+
+#[async_trait]
+impl Cache for CacheService {
+    async fn set<T: serde::Serialize + Send + Sync>(
+        &self,
+        key: &str,
+        value: &T,
+        expiry_secs: Option<u64>,
+    ) -> Result<(), redis::RedisError> {
+        self.set(key, value, expiry_secs).await
+    }
+
+    async fn get<T: serde::de::DeserializeOwned + Send + Sync>(
+        &self,
+        key: &str,
+    ) -> Result<Option<T>, redis::RedisError> {
+        self.get(key).await
+    }
+
+    async fn delete(&self, key: &str) -> Result<(), redis::RedisError> {
+        self.delete(key).await
+    }
+
+    async fn delete_by_pattern(&self, pattern: &str) -> Result<(), redis::RedisError> {
+        self.delete_by_pattern(pattern).await
+    }
+}
+
+#[async_trait]
 pub trait LicenseRepository: Send + Sync {
     // License CRUD operations
     async fn create_license(&self, license: &License) -> Result<License, sqlx::Error>;
@@ -103,17 +148,17 @@ pub trait LicenseRepository: Send + Sync {
     ) -> Result<LicenseStatistics, sqlx::Error>;
 }
 
-pub struct CachedLicenseRepository {
+pub struct CachedLicenseRepository<C: Cache> {
     pool: PgPool,
-    cache: Option<Arc<CacheService>>,
+    cache: Option<Arc<C>>,
 }
 
-impl CachedLicenseRepository {
+impl<C: Cache> CachedLicenseRepository<C> {
     pub fn new(pool: PgPool) -> Self {
         Self { pool, cache: None }
     }
 
-    pub fn new_with_cache(pool: PgPool, cache: Arc<CacheService>) -> Self {
+    pub fn new_with_cache(pool: PgPool, cache: Arc<C>) -> Self {
         Self {
             pool,
             cache: Some(cache),
@@ -185,20 +230,67 @@ impl CachedLicenseRepository {
 }
 
 #[async_trait]
-impl LicenseRepository for CachedLicenseRepository {
+impl<C: Cache> LicenseRepository for CachedLicenseRepository<C> {
     // Implement repository methods with caching
     // We'll implement a few key methods as examples
 
     #[instrument(skip(self, license))]
     async fn create_license(&self, license: &License) -> Result<License, sqlx::Error> {
-        // Implementation remains as is, but we'll invalidate relevant caches
+        let query = r#"
+            INSERT INTO licenses (
+                id, license_number, license_type, company_id, user_id,
+                title, description, issue_date, expiry_date, issuing_authority,
+                application_status, priority, estimated_processing_days, actual_processing_days,
+                external_reference_id, government_fee, service_fee, created_at, updated_at,
+                submitted_at, approved_at, rejected_at, admin_notes, rejection_reason
+            ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+                $15, $16, $17, $18, $19, $20, $21, $22, $23, $24
+            ) RETURNING *
+        "#;
 
-        // After successful creation, invalidate related caches
-        self.invalidate_license_cache(license.id, Some(license.user_id), Some(license.company_id))
+        let inserted = sqlx::query_as::<_, License>(query)
+            .bind(license.id)
+            .bind(&license.license_number)
+            .bind(&license.license_type)
+            .bind(license.company_id)
+            .bind(license.user_id)
+            .bind(&license.title)
+            .bind(&license.description)
+            .bind(license.issue_date)
+            .bind(license.expiry_date)
+            .bind(&license.issuing_authority)
+            .bind(&license.application_status)
+            .bind(&license.priority)
+            .bind(license.estimated_processing_days)
+            .bind(license.actual_processing_days)
+            .bind(&license.external_reference_id)
+            .bind(license.government_fee)
+            .bind(license.service_fee)
+            .bind(license.created_at)
+            .bind(license.updated_at)
+            .bind(license.submitted_at)
+            .bind(license.approved_at)
+            .bind(license.rejected_at)
+            .bind(&license.admin_notes)
+            .bind(&license.rejection_reason)
+            .fetch_one(&self.pool)
+            .await?;
+
+        self
+            .invalidate_license_cache(
+                inserted.id,
+                Some(inserted.user_id),
+                Some(inserted.company_id),
+            )
             .await;
 
-        // Return the created license
-        Ok(license.clone())
+        if let Some(cache) = &self.cache {
+            let cache_key = Self::license_cache_key(inserted.id);
+            let _ = cache.set(&cache_key, &inserted, Some(300)).await;
+        }
+
+        Ok(inserted)
     }
 
     #[instrument(skip(self), fields(license_id = %id))]
@@ -944,5 +1036,118 @@ impl LicenseRepository for CachedLicenseRepository {
         _admin_notes: Option<String>,
     ) -> Result<License, sqlx::Error> {
         Err(sqlx::Error::RowNotFound)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::sync::Mutex;
+    use std::collections::HashMap;
+    use sqlx::postgres::PgPoolOptions;
+    use crate::domain::licenses::{PriorityLevel};
+
+    #[derive(Clone, Default)]
+    struct InMemoryCache {
+        store: Arc<Mutex<HashMap<String, String>>>,
+    }
+
+    #[async_trait]
+    impl Cache for InMemoryCache {
+        async fn set<T: serde::Serialize + Send + Sync>(
+            &self,
+            key: &str,
+            value: &T,
+            _expiry: Option<u64>,
+        ) -> Result<(), redis::RedisError> {
+            let mut map = self.store.lock().await;
+            map.insert(key.to_string(), serde_json::to_string(value).unwrap());
+            Ok(())
+        }
+
+        async fn get<T: serde::de::DeserializeOwned + Send + Sync>(
+            &self,
+            key: &str,
+        ) -> Result<Option<T>, redis::RedisError> {
+            let map = self.store.lock().await;
+            Ok(match map.get(key) {
+                Some(v) => Some(serde_json::from_str(v).unwrap()),
+                None => None,
+            })
+        }
+
+        async fn delete(&self, key: &str) -> Result<(), redis::RedisError> {
+            let mut map = self.store.lock().await;
+            map.remove(key);
+            Ok(())
+        }
+
+        async fn delete_by_pattern(&self, pattern: &str) -> Result<(), redis::RedisError> {
+            let mut map = self.store.lock().await;
+            let prefix = pattern.trim_end_matches('*');
+            let keys: Vec<String> = map
+                .keys()
+                .filter(|k| k.starts_with(prefix))
+                .cloned()
+                .collect();
+            for k in keys { map.remove(&k); }
+            Ok(())
+        }
+    }
+
+    fn sample_license() -> License {
+        License {
+            id: Uuid::new_v4(),
+            license_number: None,
+            license_type: LicenseType::Nib,
+            company_id: Uuid::new_v4(),
+            user_id: Uuid::new_v4(),
+            title: "Test".into(),
+            description: None,
+            issue_date: None,
+            expiry_date: None,
+            issuing_authority: None,
+            application_status: ApplicationStatus::Draft,
+            priority: PriorityLevel::Normal,
+            estimated_processing_days: None,
+            actual_processing_days: None,
+            external_reference_id: None,
+            government_fee: None,
+            service_fee: None,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            submitted_at: None,
+            approved_at: None,
+            rejected_at: None,
+            admin_notes: None,
+            rejection_reason: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn cache_hit_returns_value() {
+        let cache = Arc::new(InMemoryCache::default());
+        let pool = PgPoolOptions::new().connect_lazy("postgres://localhost").unwrap();
+        let repo = CachedLicenseRepository::new_with_cache(pool, cache.clone());
+
+        let license = sample_license();
+        cache
+            .set(&CachedLicenseRepository::<InMemoryCache>::license_cache_key(license.id), &license, None)
+            .await
+            .unwrap();
+
+        let res = repo.get_license_by_id(license.id).await.unwrap().unwrap();
+        assert_eq!(res.id, license.id);
+    }
+
+    #[tokio::test]
+    async fn cache_miss_attempts_db() {
+        let cache = Arc::new(InMemoryCache::default());
+        let pool = PgPoolOptions::new().connect_lazy("postgres://localhost").unwrap();
+        let repo = CachedLicenseRepository::new_with_cache(pool, cache.clone());
+
+        let id = Uuid::new_v4();
+        let result = repo.get_license_by_id(id).await;
+        assert!(result.is_err());
     }
 }

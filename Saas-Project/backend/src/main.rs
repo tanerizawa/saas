@@ -25,10 +25,11 @@ mod tests;
 use config::AppConfig;
 use domain::repositories::{CompanyRepository, UserRepository};
 use infrastructure::{
-    database::manager::DatabaseManager,
+    db::DatabaseConnection,
     repositories::{
         CachedLicenseRepository, LicenseRepository, PostgresCompanyRepository,
-        PostgresUserRepository,
+        PostgresUserRepository, FinancialRepository, PostgresFinancialRepository,
+        AnalyticsRepository, PostgresAnalyticsRepository,
     },
     web::handlers,
 };
@@ -45,6 +46,8 @@ pub struct AppContext {
     pub user_repository: Arc<dyn UserRepository + Send + Sync>,
     pub company_repository: Arc<dyn CompanyRepository + Send + Sync>,
     pub license_repository: Arc<dyn LicenseRepository + Send + Sync>,
+    pub financial_repository: Arc<dyn infrastructure::repositories::FinancialRepository + Send + Sync>,
+    pub analytics_repository: Arc<dyn infrastructure::repositories::AnalyticsRepository + Send + Sync>,
 }
 
 // Implement the AppStateType trait for AppContext
@@ -59,6 +62,14 @@ impl infrastructure::web::handlers::AppStateType for AppContext {
     
     fn license_repository(&self) -> &Arc<dyn infrastructure::repositories::LicenseRepository + Send + Sync> {
         &self.license_repository
+    }
+    
+    fn financial_repository(&self) -> &Arc<dyn infrastructure::repositories::FinancialRepository + Send + Sync> {
+        &self.financial_repository
+    }
+    
+    fn analytics_repository(&self) -> &Arc<dyn infrastructure::repositories::AnalyticsRepository + Send + Sync> {
+        &self.analytics_repository
     }
     
     fn auth_service(&self) -> &services::auth::AuthService {
@@ -145,6 +156,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("📊 Repositories initialized");
 
+    // Initialize financial repository
+    let financial_repository = match &cache_service {
+        Some(cache) => {
+            tracing::info!("🔄 Initializing financial repository with cache");
+            Arc::new(PostgresFinancialRepository::new_with_cache(db.pool().clone(), Arc::new(cache.clone())))
+        }
+        None => {
+            tracing::info!("🔄 Initializing standard financial repository (no cache)");
+            Arc::new(PostgresFinancialRepository::new(db.pool().clone()))
+        }
+    };
+
+    info!("💰 Financial repository initialized");
+
+    // Initialize analytics repository
+    let analytics_repository = Arc::new(PostgresAnalyticsRepository::new(db.pool().clone()));
+    info!("📊 Analytics repository initialized");
+
     // Create application context
     let app_state = Arc::new(AppContext {
         config: config.clone(),
@@ -154,6 +183,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         user_repository,
         company_repository,
         license_repository,
+        financial_repository,
+        analytics_repository,
     });
 
     // Build application router
@@ -243,9 +274,13 @@ fn create_api_routes() -> Router<AppState> {
         // Placeholder routes for other handlers (public for now)
         // .route("/licensing", get(handlers::licensing::placeholder))
         .route("/business", get(handlers::business::placeholder))
-        .route("/finance", get(handlers::finance::placeholder))
         .route("/admin", get(handlers::admin::placeholder))
-        .route("/files", get(handlers::files::placeholder))
+        // File management routes
+        .nest("/files", handlers::files::routes())
+        // Financial management routes
+        .nest("/finance", handlers::finance_v2::routes())
+        // Analytics and reporting routes
+        .nest("/analytics", handlers::analytics::create_analytics_router())
 }
 
 async fn health_check() -> Result<Json<serde_json::Value>, AppError> {

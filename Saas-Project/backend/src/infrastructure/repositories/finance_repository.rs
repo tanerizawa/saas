@@ -66,13 +66,13 @@ impl TransactionRepository for PostgresTransactionRepository {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
 
         // Return the created transaction
         self.find_by_id(&TransactionId(record.id))
             .await?
             .ok_or_else(|| {
-                AppError::DatabaseError("Failed to retrieve created transaction".to_string())
+                AppError::InternalError("Failed to retrieve created transaction".to_string())
             })
     }
 
@@ -90,7 +90,7 @@ impl TransactionRepository for PostgresTransactionRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
 
         if let Some(r) = record {
             let transaction_type: TransactionType = serde_json::from_value(r.transaction_type)
@@ -181,10 +181,10 @@ impl TransactionRepository for PostgresTransactionRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
 
         self.find_by_id(&transaction.id).await?.ok_or_else(|| {
-            AppError::DatabaseError("Failed to retrieve updated transaction".to_string())
+            AppError::InternalError("Failed to retrieve updated transaction".to_string())
         })
     }
 
@@ -312,10 +312,10 @@ impl FinancialAccountRepository for PostgresFinancialAccountRepository {
         )
         .fetch_one(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
 
         self.find_by_id(record.id).await?.ok_or_else(|| {
-            AppError::DatabaseError("Failed to retrieve created account".to_string())
+            AppError::InternalError("Failed to retrieve created account".to_string())
         })
     }
 
@@ -332,7 +332,7 @@ impl FinancialAccountRepository for PostgresFinancialAccountRepository {
         )
         .fetch_optional(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
 
         if let Some(r) = record {
             let account_type: AccountType = serde_json::from_value(r.account_type)
@@ -390,10 +390,10 @@ impl FinancialAccountRepository for PostgresFinancialAccountRepository {
         )
         .execute(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
 
         self.find_by_id(account.id).await?.ok_or_else(|| {
-            AppError::DatabaseError("Failed to retrieve updated account".to_string())
+            AppError::InternalError("Failed to retrieve updated account".to_string())
         })
     }
 
@@ -411,7 +411,7 @@ impl FinancialAccountRepository for PostgresFinancialAccountRepository {
         )
         .fetch_all(&self.pool)
         .await
-        .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+        .map_err(|e| AppError::InternalError(e.to_string()))?;
 
         let mut accounts = Vec::with_capacity(records.len());
 
@@ -445,7 +445,7 @@ impl FinancialAccountRepository for PostgresFinancialAccountRepository {
         sqlx::query!("DELETE FROM financial_accounts WHERE id = $1", id)
             .execute(&self.pool)
             .await
-            .map_err(|e| AppError::DatabaseError(e.to_string()))?;
+            .map_err(|e| AppError::InternalError(e.to_string()))?;
 
         Ok(())
     }

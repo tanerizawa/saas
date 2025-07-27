@@ -13,7 +13,7 @@ use tower_http::services::ServeDir;
 
 use crate::application::services::AuthService;
 use crate::domain::repositories::{UserRepository, CompanyRepository, LicenseRepository};
-use crate::shared::config::AppConfig;
+use crate::config::AppConfig;
 
 #[derive(Clone)]
 pub struct AppState {

@@ -13,6 +13,10 @@ pub trait UserRepository {
     async fn find_by_email(&self, email: &Email) -> AppResult<Option<User>>;
     async fn save(&self, user: &User) -> AppResult<()>;
     async fn delete(&self, id: &UserId) -> AppResult<()>;
+    // Add new methods for pagination and search
+    async fn list_all(&self, limit: Option<i32>, offset: Option<i32>) -> AppResult<Vec<User>>;
+    async fn count_all(&self) -> AppResult<i64>;
+    async fn search(&self, query: &str, limit: Option<i32>, offset: Option<i32>) -> AppResult<Vec<User>>;
 }
 
 #[async_trait]

@@ -10,15 +10,21 @@ RUN apk add --no-cache musl-dev pkgconfig openssl-dev
 # Create app directory
 WORKDIR /app
 
-# Copy manifest files
-COPY Cargo.toml Cargo.lock ./
+# Copy manifest files and toolchain info
+COPY Cargo.toml Cargo.lock rust-toolchain.toml ./
+
+# Create empty source files to trigger dependency build for better layer caching
+RUN mkdir -p src && \
+    echo "fn main() {}" > src/main.rs && \
+    cargo build --release
 
 # Copy source code
 COPY src ./src
 COPY migrations ./migrations
 
-# Build the application
-RUN cargo build --release
+# Rebuild with actual source code
+RUN touch src/main.rs && \
+    cargo build --release
 
 # Runtime stage
 FROM alpine:latest AS runtime
@@ -33,9 +39,11 @@ RUN addgroup -g 1000 app && adduser -D -s /bin/sh -u 1000 -G app app
 WORKDIR /app
 
 # Copy binary from builder stage
-COPY --from=builder /app/target/release/server /app/
-COPY --from=builder /app/target/release/migrate /app/
+COPY --from=builder /app/target/release/backend /app/
 COPY --from=builder /app/migrations /app/migrations
+
+# Create uploads directory
+RUN mkdir -p /app/uploads
 
 # Change ownership to app user
 RUN chown -R app:app /app
@@ -44,14 +52,17 @@ RUN chown -R app:app /app
 USER app
 
 # Expose port
-EXPOSE 8000
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8000/health || exit 1
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+# Set environment variables
+ENV RUST_BACKTRACE=1
 
 # Start the application
-CMD ["./server"]
+CMD ["./backend"]
 
 # Development stage (for development with hot reload)
 FROM rust:1.75-alpine AS development

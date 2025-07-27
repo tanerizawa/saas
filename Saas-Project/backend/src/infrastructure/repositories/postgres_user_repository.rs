@@ -242,4 +242,162 @@ impl UserRepository for PostgresUserRepository {
         info!("Successfully deleted user: {}", id.as_uuid());
         Ok(())
     }
+    
+    #[instrument(skip(self), fields(limit, offset))]
+    async fn list_all(&self, limit: Option<i32>, offset: Option<i32>) -> AppResult<Vec<User>> {
+        info!("Listing users with limit: {:?}, offset: {:?}", limit, offset);
+
+        let query = match (limit, offset) {
+            (Some(limit), Some(offset)) => {
+                sqlx::query(
+                    r#"
+                    SELECT id, email, password_hash, full_name, role, status, 
+                           email_verified, created_at, updated_at
+                    FROM users
+                    ORDER BY created_at DESC
+                    LIMIT $1 OFFSET $2
+                    "#
+                )
+                .bind(limit)
+                .bind(offset)
+            },
+            (Some(limit), None) => {
+                sqlx::query(
+                    r#"
+                    SELECT id, email, password_hash, full_name, role, status, 
+                           email_verified, created_at, updated_at
+                    FROM users
+                    ORDER BY created_at DESC
+                    LIMIT $1
+                    "#
+                )
+                .bind(limit)
+            },
+            _ => {
+                sqlx::query(
+                    r#"
+                    SELECT id, email, password_hash, full_name, role, status, 
+                           email_verified, created_at, updated_at
+                    FROM users
+                    ORDER BY created_at DESC
+                    "#
+                )
+            }
+        };
+
+        let rows = query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| {
+                error!("Database error listing users: {}", e);
+                AppError::Database(e)
+            })?;
+
+        let mut users = Vec::new();
+        for row in rows {
+            match self.row_to_user(&row) {
+                Ok(user) => users.push(user),
+                Err(e) => {
+                    error!("Error converting row to user: {}", e);
+                    continue;
+                }
+            }
+        }
+
+        info!("Found {} users", users.len());
+        Ok(users)
+    }
+
+    #[instrument(skip(self))]
+    async fn count_all(&self) -> AppResult<i64> {
+        use sqlx::Row;
+        
+        let row = sqlx::query("SELECT COUNT(*) as count FROM users")
+            .fetch_one(&self.pool)
+            .await
+            .map_err(|e| {
+                error!("Database error counting users: {}", e);
+                AppError::Database(e)
+            })?;
+
+        let count: i64 = row.try_get("count").map_err(|e| {
+            error!("Error getting count from row: {}", e);
+            AppError::Database(e)
+        })?;
+
+        info!("Total user count: {}", count);
+        Ok(count)
+    }
+
+    #[instrument(skip(self), fields(query))]
+    async fn search(&self, query: &str, limit: Option<i32>, offset: Option<i32>) -> AppResult<Vec<User>> {
+        info!("Searching users with query: {}", query);
+
+        let search_term = format!("%{}%", query);
+        let sql_query = match (limit, offset) {
+            (Some(limit), Some(offset)) => {
+                sqlx::query(
+                    r#"
+                    SELECT id, email, password_hash, full_name, role, status, 
+                           email_verified, created_at, updated_at
+                    FROM users
+                    WHERE email ILIKE $1 OR full_name ILIKE $1
+                    ORDER BY created_at DESC
+                    LIMIT $2 OFFSET $3
+                    "#
+                )
+                .bind(&search_term)
+                .bind(limit)
+                .bind(offset)
+            },
+            (Some(limit), None) => {
+                sqlx::query(
+                    r#"
+                    SELECT id, email, password_hash, full_name, role, status, 
+                           email_verified, created_at, updated_at
+                    FROM users
+                    WHERE email ILIKE $1 OR full_name ILIKE $1
+                    ORDER BY created_at DESC
+                    LIMIT $2
+                    "#
+                )
+                .bind(&search_term)
+                .bind(limit)
+            },
+            _ => {
+                sqlx::query(
+                    r#"
+                    SELECT id, email, password_hash, full_name, role, status, 
+                           email_verified, created_at, updated_at
+                    FROM users
+                    WHERE email ILIKE $1 OR full_name ILIKE $1
+                    ORDER BY created_at DESC
+                    "#
+                )
+                .bind(&search_term)
+            }
+        };
+
+        let rows = sql_query
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|e| {
+                error!("Database error searching users: {}", e);
+                AppError::Database(e)
+            })?;
+
+        let mut users = Vec::new();
+        for row in rows {
+            match self.row_to_user(&row) {
+                Ok(user) => users.push(user),
+                Err(e) => {
+                    error!("Error converting row to user: {}", e);
+                    continue;
+                }
+            }
+        }
+
+        info!("Found {} users matching query: {}", users.len(), query);
+        Ok(users)
+    }
 }

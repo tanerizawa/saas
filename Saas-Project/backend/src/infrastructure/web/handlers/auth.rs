@@ -1,14 +1,13 @@
 use axum::{extract::State, http::StatusCode, response::Json};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::Arc;
-use uuid::Uuid;
 
 use crate::domain::entities::{User, UserRole};
-use crate::domain::value_objects::{Email, UserId};
+use crate::domain::value_objects::Email;
+use crate::infrastructure::web::middleware::auth::AuthenticatedUser;
 
-// For now, use a type alias since AppState isn't defined yet
-type AppState = crate::AppContext;
+// Use the AppState from the handlers module
+use super::AppState;
 
 #[derive(Serialize)]
 pub struct UserProfileResponse {
@@ -49,7 +48,7 @@ pub struct UserProfile {
 
 /// User registration endpoint
 pub async fn register(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Json(payload): Json<RegisterDto>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     // Parse email
@@ -72,7 +71,7 @@ pub async fn register(
 
     // Hash password
     let password_hash = state
-        .auth_service
+        .auth_service()
         .hash_password(&payload.password)
         .map_err(|err| {
             (
@@ -88,7 +87,7 @@ pub async fn register(
     let user = User::new(email, password_hash, payload.full_name, role);
 
     // Save user to database
-    state.user_repository.save(&user).await.map_err(|err| {
+    state.user_repository().save(&user).await.map_err(|err| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
@@ -107,7 +106,7 @@ pub async fn register(
 
 /// User login endpoint
 pub async fn login(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     Json(payload): Json<LoginDto>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
     // Parse email
@@ -123,7 +122,7 @@ pub async fn login(
 
     // Find user by email
     let mut user = state
-        .user_repository
+        .user_repository()
         .find_by_email(&email)
         .await
         .map_err(|err| {
@@ -146,7 +145,7 @@ pub async fn login(
 
     // Verify password
     let is_valid = state
-        .auth_service
+        .auth_service()
         .verify_password(&payload.password, &user.password_hash)
         .map_err(|_| {
             (
@@ -180,7 +179,7 @@ pub async fn login(
     user.update_last_login();
 
     // Save updated user back to database
-    state.user_repository.save(&user).await.map_err(|err| {
+    state.user_repository().save(&user).await.map_err(|err| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
@@ -191,7 +190,7 @@ pub async fn login(
     })?;
 
     // Generate tokens
-    let tokens = state.auth_service.generate_tokens(&user).map_err(|err| {
+    let tokens = state.auth_service().generate_tokens(&user).map_err(|err| {
         (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({
@@ -216,118 +215,67 @@ pub async fn login(
 
 /// Get current user profile
 pub async fn get_profile(
-    State(state): State<Arc<AppState>>,
-    auth_user: crate::infrastructure::web::middleware::auth::AuthenticatedUser,
+    State(state): State<AppState>,
+    user: AuthenticatedUser,
 ) -> Result<Json<UserProfileResponse>, (StatusCode, Json<serde_json::Value>)> {
-    let user = state
-        .user_repository
-        .find_by_id(&auth_user.user_id)
+    let user_id = user.user_id;
+
+    let user_data = state
+        .user_repository()
+        .find_by_id(&user_id)
         .await
         .map_err(|err| {
             (
                 StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": err.to_string() })),
+                Json(json!({
+                    "error": "Database error",
+                    "details": err.to_string()
+                })),
             )
         })?
         .ok_or_else(|| {
             (
                 StatusCode::NOT_FOUND,
-                Json(json!({ "error": "User not found" })),
+                Json(json!({"error": "User not found"})),
             )
         })?;
 
     let response = UserProfileResponse {
-        id: user.id.to_string(),
-        email: user.email.as_str().to_string(),
-        role: user.role.to_string(),
-        is_verified: user.email_verified_at.is_some(),
-        created_at: user.created_at,
+        id: user_data.id.to_string(),
+        email: user_data.email.as_str().to_string(),
+        role: user_data.role.to_string(),
+        is_verified: user_data.email_verified_at.is_some(),
+        created_at: user_data.created_at,
     };
 
     Ok(Json(response))
 }
-
-/// Refresh access token
 pub async fn refresh_token(
-    State(state): State<Arc<AppState>>,
+    State(_state): State<AppState>,
     Json(payload): Json<serde_json::Value>,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    let refresh_token = payload
+    let _refresh_token = payload
         .get("refresh_token")
         .and_then(|v| v.as_str())
         .ok_or_else(|| {
             (
                 StatusCode::BAD_REQUEST,
-                Json(json!({
-                    "error": "Missing refresh token"
-                })),
+                Json(json!({"error": "refresh_token is required"})),
             )
         })?;
 
-    // Validate refresh token
-    let claims = state
-        .auth_service
-        .validate_token(refresh_token)
-        .map_err(|err| {
-            (
-                StatusCode::UNAUTHORIZED,
-                Json(json!({
-                    "error": "Invalid refresh token",
-                    "details": err.to_string()
-                })),
-            )
-        })?;
-
-    let user_id = Uuid::parse_str(&claims.sub).map_err(|_| {
-        (
-            StatusCode::UNAUTHORIZED,
-            Json(json!({"error": "Invalid token claims"})),
-        )
-    })?;
-
-    let user = state
-        .user_repository
-        .find_by_id(&UserId(user_id))
-        .await
-        .map_err(|err| {
-            (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                Json(json!({ "error": err.to_string() })),
-            )
-        })?
-        .ok_or_else(|| {
-            (
-                StatusCode::NOT_FOUND,
-                Json(json!({ "error": "User not found" })),
-            )
-        })?;
-
-    let tokens = state.auth_service.generate_tokens(&user).map_err(|err| {
-        (
-            StatusCode::INTERNAL_SERVER_ERROR,
-            Json(json!({ "error": err.to_string() })),
-        )
-    })?;
-
-    Ok(Json(json!({
-        "access_token": tokens.access_token,
-        "refresh_token": tokens.refresh_token,
-        "expires_at": tokens.expires_at,
-        "user": {
-            "id": user.id.to_string(),
-            "email": user.email.as_str(),
-            "full_name": user.full_name,
-            "role": user.role.to_string()
-        }
-    })))
-}
-
-/// Logout endpoint
+    // TODO: Implement refresh token logic
+    // For now, return a not implemented error
+    Err((
+        StatusCode::NOT_IMPLEMENTED,
+        Json(json!({"error": "Refresh token functionality not yet implemented"})),
+    ))
+}/// Logout endpoint
 pub async fn logout(
-    State(state): State<Arc<AppState>>,
+    State(state): State<AppState>,
     auth_user: crate::infrastructure::web::middleware::auth::AuthenticatedUser,
 ) -> Result<Json<serde_json::Value>, (StatusCode, Json<serde_json::Value>)> {
-    if let Some(cache) = &state.cache_service {
+    if let Some(cache) = state.cache_service() {
         let pattern = format!("refresh:{}:*", auth_user.user_id);
         let _ = cache.delete_by_pattern(&pattern).await;
     }

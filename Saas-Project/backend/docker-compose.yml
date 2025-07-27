@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # Backend API service
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      - DATABASE_URL=postgres://saas_user:saas_password@db:5432/saas_db
+      - APP_HOST=0.0.0.0
+      - APP_PORT=8080
+      - JWT_SECRET=your_secure_jwt_secret_key_here
+      - JWT_EXPIRES_IN=24h
+      - JWT_REFRESH_EXPIRES_IN=7d
+      - REDIS_URL=redis://redis:6379
+      - UPLOAD_DIR=/app/uploads
+      - MAX_FILE_SIZE=10485760
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+      - SMTP_USERNAME=
+      - SMTP_PASSWORD=
+      - SMTP_FROM_EMAIL=noreply@example.com
+      - SMTP_FROM_NAME=SaaS Application
+      - ENABLE_RATE_LIMITING=true
+      - RATE_LIMIT_MAX_REQUESTS=100
+      - RATE_LIMIT_WINDOW_SECS=60
+      - RUST_LOG=info,actix_web=info,sqlx=warn
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      - db
+      - redis
+      - mailhog
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # PostgreSQL database
+  db:
+    image: postgres:14
+    restart: always
+    environment:
+      - POSTGRES_USER=saas_user
+      - POSTGRES_PASSWORD=saas_password
+      - POSTGRES_DB=saas_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U saas_user -d saas_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # Redis for caching and rate limiting
+  redis:
+    image: redis:7.0-alpine
+    restart: always
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # MailHog for email testing
+  mailhog:
+    image: mailhog/mailhog:latest
+    restart: always
+    ports:
+      - "8025:8025" # Web UI
+      - "1025:1025" # SMTP Server
+
+volumes:
+  postgres_data:
+  redis_data:
+  uploads:

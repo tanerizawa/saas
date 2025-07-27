@@ -5,7 +5,6 @@ use axum::{
     middleware::Next,
     response::Response,
 };
-use std::sync::Arc;
 
 use crate::domain::entities::UserRole;
 use crate::domain::value_objects::UserId;
@@ -18,9 +17,11 @@ pub struct AuthenticatedUser {
     pub role: UserRole,
 }
 
+use crate::infrastructure::web::handlers::AppState;
+
 /// JWT Authentication middleware
 pub async fn require_auth(
-    State(ctx): State<Arc<crate::AppContext>>,
+    State(ctx): State<AppState>,
     mut request: Request,
     next: Next,
 ) -> Result<Response, AppError> {
@@ -42,18 +43,18 @@ pub async fn require_auth(
 
     // Validate token
     let user_id = ctx
-        .auth_service
+        .auth_service()
         .extract_user_id(token)
         .map_err(|_| AppError::Unauthorized("Invalid token".to_string()))?;
 
     let user_role = ctx
-        .auth_service
+        .auth_service()
         .extract_user_role(token)
         .map_err(|_| AppError::Unauthorized("Invalid token claims".to_string()))?;
 
     // Get company_id from the token claims or user service
     let company_id = ctx
-        .auth_service
+        .auth_service()
         .extract_company_id(token)
         .unwrap_or_else(|_| uuid::Uuid::new_v4()); // Default fallback
 

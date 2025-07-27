@@ -19,11 +19,13 @@ use crate::{
         LicenseType, PriorityLevel,
     },
     domain::entities::UserRole,
-    infrastructure::repositories::license_repository::LicenseStatistics,
-    // infrastructure::repositories::LicenseRepository,
-    infrastructure::web::middleware::auth::AuthenticatedUser,
-    AppState,
+    infrastructure::{repositories::license_repository::LicenseStatistics,
+    // repositories::LicenseRepository,
+    web::middleware::auth::AuthenticatedUser},
 };
+
+// Use the AppState from the handlers module
+use super::AppState;
 
 #[derive(Debug, Deserialize)]
 pub struct CreateLicenseRequest {
@@ -114,7 +116,7 @@ async fn create_license(
         request.description,
     );
 
-    match app_state.license_repository.create_license(&license).await {
+    match app_state.license_repository().create_license(&license).await {
         Ok(created_license) => Ok(Json(created_license)),
         Err(e) => {
             tracing::error!("Failed to create license: {}", e);
@@ -133,7 +135,7 @@ async fn get_user_licenses(
     let licenses = if let Some(status) = params.status {
         // Get by status (need to filter by user)
         match app_state
-            .license_repository
+            .license_repository()
             .get_licenses_by_status(status)
             .await
         {
@@ -149,7 +151,7 @@ async fn get_user_licenses(
     } else if let Some(license_type) = params.license_type {
         // Get by type (need to filter by user)
         match app_state
-            .license_repository
+            .license_repository()
             .get_licenses_by_type(license_type)
             .await
         {
@@ -165,7 +167,7 @@ async fn get_user_licenses(
     } else if let Some(company_id) = params.company_id {
         // Get by company
         match app_state
-            .license_repository
+            .license_repository()
             .get_licenses_by_company(company_id)
             .await
         {
@@ -181,7 +183,7 @@ async fn get_user_licenses(
     } else {
         // Get all user licenses
         match app_state
-            .license_repository
+            .license_repository()
             .get_licenses_by_user(*user.user_id.as_uuid())
             .await
         {
@@ -204,7 +206,7 @@ async fn get_license_by_id(
 ) -> Result<Json<LicenseResponse>, StatusCode> {
     // Get license
     let license = match app_state
-        .license_repository
+        .license_repository()
         .get_license_by_id(license_id)
         .await
     {
@@ -224,7 +226,7 @@ async fn get_license_by_id(
 
     // Get documents
     let documents = match app_state
-        .license_repository
+        .license_repository()
         .get_documents_by_license(license_id)
         .await
     {
@@ -237,7 +239,7 @@ async fn get_license_by_id(
 
     // Get status history
     let status_history = match app_state
-        .license_repository
+        .license_repository()
         .get_status_history_by_license(license_id)
         .await
     {
@@ -264,7 +266,7 @@ async fn update_license(
 ) -> Result<Json<License>, StatusCode> {
     // Get existing license
     let mut license = match app_state
-        .license_repository
+        .license_repository()
         .get_license_by_id(license_id)
         .await
     {
@@ -303,7 +305,7 @@ async fn update_license(
     license.updated_at = Utc::now();
 
     // Save updated license
-    match app_state.license_repository.update_license(&license).await {
+    match app_state.license_repository().update_license(&license).await {
         Ok(updated_license) => Ok(Json(updated_license)),
         Err(e) => {
             tracing::error!("Failed to update license: {}", e);
@@ -320,7 +322,7 @@ async fn delete_license(
 ) -> Result<StatusCode, StatusCode> {
     // Get existing license to check ownership and status
     let _license = match app_state
-        .license_repository
+        .license_repository()
         .get_license_by_id(license_id)
         .await
     {
@@ -344,7 +346,7 @@ async fn delete_license(
 
     // Delete license
     match app_state
-        .license_repository
+        .license_repository()
         .delete_license(license_id)
         .await
     {
@@ -365,7 +367,7 @@ async fn submit_license(
 ) -> Result<Json<License>, StatusCode> {
     // Check license ownership
     let _license = match app_state
-        .license_repository
+        .license_repository()
         .get_license_by_id(license_id)
         .await
     {
@@ -384,7 +386,7 @@ async fn submit_license(
 
     // Submit application
     match app_state
-        .license_repository
+        .license_repository()
         .submit_license_application(license_id, *user.user_id.as_uuid())
         .await
     {
@@ -408,7 +410,7 @@ async fn approve_license(
     }
 
     match app_state
-        .license_repository
+        .license_repository()
         .approve_license(
             license_id,
             *admin_user.user_id.as_uuid(),
@@ -440,7 +442,7 @@ async fn reject_license(
     }
 
     match app_state
-        .license_repository
+        .license_repository()
         .reject_license(
             license_id,
             *admin_user.user_id.as_uuid(),
@@ -466,7 +468,7 @@ async fn search_licenses(
     let search_query = params.search.unwrap_or_default();
 
     match app_state
-        .license_repository
+        .license_repository()
         .search_licenses(&search_query, Some(*user.user_id.as_uuid()))
         .await
     {
@@ -486,7 +488,7 @@ async fn get_license_documents(
 ) -> Result<Json<Vec<LicenseDocument>>, StatusCode> {
     // Check license ownership
     let _license = match app_state
-        .license_repository
+        .license_repository()
         .get_license_by_id(license_id)
         .await
     {
@@ -504,7 +506,7 @@ async fn get_license_documents(
     };
 
     match app_state
-        .license_repository
+        .license_repository()
         .get_documents_by_license(license_id)
         .await
     {
@@ -537,7 +539,7 @@ async fn upload_license_document(
     mut multipart: Multipart,
 ) -> Result<Json<LicenseDocument>, StatusCode> {
     // Verify license ownership
-    let license = match app_state.license_repository.get_license_by_id(license_id).await {
+    let license = match app_state.license_repository().get_license_by_id(license_id).await {
         Ok(Some(license)) => {
             if license.user_id != *user.user_id.as_uuid() {
                 return Err(StatusCode::FORBIDDEN);
@@ -551,7 +553,7 @@ async fn upload_license_document(
         }
     };
 
-    let base_dir = format!("{}/{}", app_state.config.upload_dir, license.id);
+    let base_dir = format!("{}/{}", app_state.config().upload_dir, license.id);
     if let Err(e) = fs::create_dir_all(&base_dir).await {
         tracing::error!("Failed to create upload directory: {}", e);
         return Err(StatusCode::INTERNAL_SERVER_ERROR);
@@ -566,7 +568,7 @@ async fn upload_license_document(
             .unwrap_or_else(|| "application/octet-stream".to_string());
         let data = field.bytes().await.map_err(|_| StatusCode::BAD_REQUEST)?;
 
-        if data.len() as u64 > app_state.config.max_file_size {
+        if data.len() as u64 > app_state.config().max_file_size {
             return Err(StatusCode::PAYLOAD_TOO_LARGE);
         }
 
@@ -589,7 +591,7 @@ async fn upload_license_document(
             content_type,
         );
 
-        match app_state.license_repository.create_document(&document).await {
+        match app_state.license_repository().create_document(&document).await {
             Ok(saved) => return Ok(Json(saved)),
             Err(e) => {
                 tracing::error!("Failed to save document record: {}", e);
@@ -609,7 +611,7 @@ async fn get_license_status_history(
 ) -> Result<Json<Vec<ApplicationStatusHistory>>, StatusCode> {
     // Check license ownership
     let _license = match app_state
-        .license_repository
+        .license_repository()
         .get_license_by_id(license_id)
         .await
     {
@@ -627,7 +629,7 @@ async fn get_license_status_history(
     };
 
     match app_state
-        .license_repository
+        .license_repository()
         .get_status_history_by_license(license_id)
         .await
     {
@@ -645,7 +647,7 @@ async fn get_license_statistics(
     user: AuthenticatedUser,
 ) -> Result<Json<LicenseStatistics>, StatusCode> {
     match app_state
-        .license_repository
+        .license_repository()
         .get_license_statistics(Some(*user.user_id.as_uuid()))
         .await
     {

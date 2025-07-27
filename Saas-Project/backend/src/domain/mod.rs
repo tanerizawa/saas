@@ -6,6 +6,7 @@ pub mod business;
 pub mod companies;
 pub mod dto;
 pub mod entities;
+pub mod errors;
 pub mod events;
 pub mod finance;
 pub mod licenses;

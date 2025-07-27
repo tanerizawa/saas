@@ -19,11 +19,13 @@ mod domain;
 mod infrastructure;
 mod services;
 mod shared;
+#[cfg(test)]
+mod tests;
 
 use config::AppConfig;
 use domain::repositories::{CompanyRepository, UserRepository};
 use infrastructure::{
-    database::DatabaseConnection,
+    database::manager::DatabaseManager,
     repositories::{
         CachedLicenseRepository, LicenseRepository, PostgresCompanyRepository,
         PostgresUserRepository,
@@ -33,18 +35,47 @@ use infrastructure::{
 use services::auth::AuthService;
 use shared::errors::AppError;
 
-type AppState = Arc<AppContext>;
-
+// Define AppContext and AppState types
 #[derive(Clone)]
 pub struct AppContext {
     pub config: AppConfig,
-    pub db: DatabaseConnection,
+    pub db: DatabaseManager,
     pub auth_service: AuthService,
     pub cache_service: Option<infrastructure::cache::CacheService>,
     pub user_repository: Arc<dyn UserRepository + Send + Sync>,
     pub company_repository: Arc<dyn CompanyRepository + Send + Sync>,
     pub license_repository: Arc<dyn LicenseRepository + Send + Sync>,
 }
+
+// Implement the AppStateType trait for AppContext
+impl infrastructure::web::handlers::AppStateType for AppContext {
+    fn company_repository(&self) -> &Arc<dyn domain::repositories::CompanyRepository + Send + Sync> {
+        &self.company_repository
+    }
+    
+    fn user_repository(&self) -> &Arc<dyn domain::repositories::UserRepository + Send + Sync> {
+        &self.user_repository
+    }
+    
+    fn license_repository(&self) -> &Arc<dyn infrastructure::repositories::LicenseRepository + Send + Sync> {
+        &self.license_repository
+    }
+    
+    fn auth_service(&self) -> &services::auth::AuthService {
+        &self.auth_service
+    }
+
+    fn config(&self) -> &config::AppConfig {
+        &self.config
+    }
+
+    fn cache_service(&self) -> &Option<infrastructure::cache::CacheService> {
+        &self.cache_service
+    }
+}
+
+// Use the AppState type alias from the handlers module
+pub use infrastructure::web::handlers::AppState;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {

@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 use std::env;
+use tracing::instrument;
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct AppConfig {
@@ -81,6 +82,7 @@ pub struct ExternalApiConfig {
 }
 
 impl AppConfig {
+    #[instrument(level = "debug", name = "config.from_env", skip_all)]
     pub fn from_env() -> Result<Self, Box<dyn std::error::Error>> {
         // Load environment variables from .env file
         dotenvy::dotenv().ok();

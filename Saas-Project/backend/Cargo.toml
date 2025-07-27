@@ -55,7 +55,7 @@ thiserror = "1.0"
 reqwest = { version = "0.11", features = ["json", "rustls-tls"] }
 
 # File Upload and Storage
-multipart = "0.18"
+# Using axum's built-in multipart support instead of separate multipart crate
 mime = "0.3"
 
 # Environment
@@ -85,6 +85,13 @@ metrics-exporter-prometheus = "0.13"
 [dev-dependencies]
 tokio-test = "0.4"
 assert_matches = "1.5"
+criterion = { version = "0.5.1", features = ["async_tokio"] }
+fake = { version = "2.8.0", features = ["derive"] }
+mockall = "0.11.4"
+rstest = "0.18.2"
+test-context = "0.1.4"
+cargo-tarpaulin = "0.27.1"
+proptest = "1.2.0"
 
 [[bin]]
 name = "server"
@@ -93,6 +100,10 @@ path = "src/main.rs"
 [[bin]]
 name = "migrate"
 path = "src/bin/migrate.rs"
+
+[[bench]]
+name = "user_repository_benchmarks"
+harness = false
 
 [profile.dev]
 debug = true

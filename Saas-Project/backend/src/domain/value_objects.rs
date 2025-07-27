@@ -37,11 +37,23 @@ pub struct Email(pub String);
 
 impl Email {
     pub fn new(email: &str) -> Result<Self, String> {
-        if email.contains('@') && email.len() > 3 {
-            Ok(Self(email.to_string()))
-        } else {
-            Err("Invalid email format".to_string())
+        // Improved email validation
+        if email.is_empty() {
+            return Err("Email cannot be empty".to_string());
         }
+        
+        // Check format: should contain exactly one @ with non-empty local and domain parts
+        let parts: Vec<&str> = email.split('@').collect();
+        if parts.len() != 2 || parts[0].is_empty() || parts[1].is_empty() {
+            return Err("Invalid email format".to_string());
+        }
+        
+        // Domain part should contain at least one dot
+        if !parts[1].contains('.') {
+            return Err("Invalid domain format in email".to_string());
+        }
+        
+        Ok(Self(email.to_string()))
     }
 
     pub fn value(&self) -> &str {

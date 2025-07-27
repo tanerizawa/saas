@@ -14,7 +14,8 @@ use crate::application::queries::GetUserQuery;
 use crate::application::query_handlers::UserQueryHandler;
 use crate::shared::errors::AppError;
 
-type AppState = crate::AppState;
+// Import AppState from handlers module
+use super::AppState;
 
 #[derive(Deserialize)]
 pub struct ListUsersQuery {
@@ -44,7 +45,7 @@ pub async fn get_user(
         .map_err(|_| AppError::BadRequest("Invalid user ID format".to_string()))?;
     
     let query = GetUserQuery::new(user_id);
-    let query_handler = UserQueryHandler::new(state.user_repository.clone());
+    let query_handler = UserQueryHandler::new(state.user_repository().clone());
     
     match query_handler.handle_get_user(query).await {
         Ok(Some(user)) => Ok(Json(json!({
@@ -68,7 +69,7 @@ pub async fn list_users(
     let page = params.page.unwrap_or(1);
     let limit = params.limit.unwrap_or(20);
     
-    let query_handler = UserQueryHandler::new(state.user_repository.clone());
+    let query_handler = UserQueryHandler::new(state.user_repository().clone());
     
     match query_handler.handle_list_users(page, limit).await {
         Ok(response) => {
@@ -112,7 +113,7 @@ pub async fn search_users(
 ) -> Result<Json<Value>, AppError> {
     let query_text = params.q.unwrap_or_default();
     
-    let query_handler = UserQueryHandler::new(state.user_repository.clone());
+    let query_handler = UserQueryHandler::new(state.user_repository().clone());
     
     match query_handler.handle_search_users(&query_text).await {
         Ok(users) => {

@@ -15,8 +15,10 @@ use crate::{
     },
     infrastructure::web::middleware::auth::AuthenticatedUser,
     shared::errors::{AppError, AppResult},
-    AppContext,
 };
+
+// Import the AppState from handlers module
+use super::AppState;
 
 // Request/Response DTOs
 #[derive(Debug, Serialize, Deserialize)]
@@ -191,11 +193,11 @@ fn determine_business_scale(
 
 // API Handlers
 pub async fn create_company(
-    State(state): State<std::sync::Arc<AppContext>>,
+    State(state): State<AppState>,
     user: AuthenticatedUser,
     Json(payload): Json<CreateCompanyRequest>,
 ) -> AppResult<(StatusCode, Json<CompanyResponse>)> {
-    let company_repo = &state.company_repository;
+    let company_repo = state.company_repository();
 
     // Validate business type
     let business_type =
@@ -250,11 +252,11 @@ pub async fn create_company(
 }
 
 pub async fn get_company(
-    State(state): State<std::sync::Arc<AppContext>>,
+    State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
 ) -> AppResult<Json<CompanyResponse>> {
-    let company_repo = &state.company_repository;
+    let company_repo = state.company_repository();
 
     let company = company_repo
         .find_by_id(&company_id)
@@ -273,12 +275,12 @@ pub async fn get_company(
 }
 
 pub async fn update_company(
-    State(state): State<std::sync::Arc<AppContext>>,
+    State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
     Json(payload): Json<UpdateCompanyRequest>,
 ) -> AppResult<Json<CompanyResponse>> {
-    let company_repo = &state.company_repository;
+    let company_repo = state.company_repository();
 
     let mut company = company_repo
         .find_by_id(&company_id)
@@ -361,11 +363,11 @@ pub async fn update_company(
 }
 
 pub async fn delete_company(
-    State(state): State<std::sync::Arc<AppContext>>,
+    State(state): State<AppState>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
 ) -> AppResult<StatusCode> {
-    let company_repo = &state.company_repository;
+    let company_repo = state.company_repository();
 
     let company = company_repo
         .find_by_id(&company_id)
@@ -385,11 +387,11 @@ pub async fn delete_company(
 }
 
 pub async fn list_companies(
-    State(state): State<std::sync::Arc<AppContext>>,
+    State(state): State<AppState>,
     user: AuthenticatedUser,
     Query(query): Query<ListCompaniesQuery>,
 ) -> AppResult<Json<ListCompaniesResponse>> {
-    let company_repo = &state.company_repository;
+    let company_repo = state.company_repository();
 
     let limit = query.limit.unwrap_or(20).min(100); // Max 100 items per page
     let offset = query.offset.unwrap_or(0);
@@ -432,10 +434,10 @@ pub async fn list_companies(
 }
 
 pub async fn get_my_companies(
-    State(state): State<std::sync::Arc<AppContext>>,
+    State(state): State<AppState>,
     user: AuthenticatedUser,
 ) -> AppResult<Json<Vec<CompanyResponse>>> {
-    let company_repo = &state.company_repository;
+    let company_repo = state.company_repository();
 
     let companies = company_repo
         .find_by_owner_id(user.user_id.as_uuid())
@@ -448,7 +450,7 @@ pub async fn get_my_companies(
 }
 
 // Routes configuration
-pub fn routes() -> Router<std::sync::Arc<AppContext>> {
+pub fn routes() -> Router<AppState> {
     Router::new()
         .route("/", post(create_company))
         .route("/", get(list_companies))

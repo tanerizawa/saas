@@ -3,6 +3,7 @@ use axum::{
     http::{HeaderMap, Request, StatusCode},
     middleware::Next,
     response::{IntoResponse, Response},
+    body::Body,
 };
 use std::collections::HashMap;
 use std::{
@@ -13,8 +14,8 @@ use std::{
 use tokio::sync::Mutex;
 use tracing::{error, warn};
 
-use crate::shared::errors::AppError;
-use crate::AppState;
+// For shared state
+use crate::infrastructure::web::handlers::AppState;
 
 // Simple in-memory rate limiter
 // For production, this would be better implemented with Redis
@@ -96,15 +97,15 @@ fn get_client_ip(headers: &HeaderMap, connection_info: Option<IpAddr>) -> Option
 }
 
 // Middleware function for rate limiting
-pub async fn rate_limit<B>(
+pub async fn rate_limit(
     State(state): State<AppState>,
     headers: HeaderMap,
     connection_info: Option<IpAddr>,
-    request: Request<B>,
-    next: Next<B>,
+    request: Request<Body>,
+    next: Next,
 ) -> Result<Response, StatusCode> {
     // Skip rate limiting if rate limiter not configured
-    let rate_limiter = match &state.config.rate_limiter {
+    let rate_limiter = match &state.config().rate_limiter {
         Some(limiter) => limiter.clone(),
         None => return Ok(next.run(request).await),
     };

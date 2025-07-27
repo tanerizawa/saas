@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use super::queries::{GetUserQuery, ListLicensesQuery};
 use crate::domain::entities::User;
-use crate::domain::repositories::{LicenseRepository, UserRepository};
+use crate::domain::repositories::UserRepository;
+use crate::infrastructure::repositories::LicenseRepository;
 use crate::shared::errors::AppResult;
 use crate::shared::types::PaginatedResponse;
 

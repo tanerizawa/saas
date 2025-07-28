@@ -1,4 +1,4 @@
-use axum::{extract::State, http::StatusCode, response::Json, routing::get, Router};
+use axum::{response::Json, routing::get, Router};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
@@ -149,21 +149,32 @@ fn create_api_routes() -> Router<AppState> {
             axum::routing::post(handlers::auth::refresh_token),
         )
         .route(
+            "/auth/logout",
+            axum::routing::post(handlers::auth::logout),
+        )
+        .route(
             "/auth/reset-password",
             axum::routing::post(handlers::auth::request_password_reset),
         )
-        .route("/auth/health", get(handlers::auth::health_check))
-        // Protected routes
-        .route("/me", get(handlers::auth::get_profile))
-        .route("/auth/logout", axum::routing::post(handlers::auth::logout))
-        // Management routes
-        .nest("/users", handlers::users::routes())
-        .nest("/companies", handlers::companies::routes())
-        .nest("/licenses", handlers::licenses::routes())
-        .nest("/files", handlers::files::routes())
-        // Placeholder routes
-        .route("/business", get(handlers::business::placeholder))
-        .route("/admin", get(handlers::admin::placeholder))
+        .route(
+            "/auth/health", 
+            axum::routing::get(handlers::auth::health_check)
+        )
+        // User routes
+        .route("/users/profile", axum::routing::get(handlers::users::get_current_user_profile))
+        // TODO: Fix companies middleware authentication issues
+        // .route("/users/companies", axum::routing::get(handlers::companies::get_my_companies))
+        
+        // TODO: Company management routes - fix authentication middleware
+        // .nest("/companies", handlers::companies::routes())
+        
+        // TODO: Financial management routes - disabled until fixed  
+        // .nest("/finance", handlers::finance_v2::router())
+        
+        // Admin routes
+        .nest("/admin", Router::new()
+            .route("/placeholder", axum::routing::get(handlers::admin::placeholder))
+        )
 }
 
 async fn health_check() -> Result<Json<serde_json::Value>, AppError> {

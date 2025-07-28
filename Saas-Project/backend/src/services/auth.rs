@@ -16,7 +16,7 @@ pub struct AuthService {
     refresh_token_duration: Duration,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
     pub sub: String,  // Subject (user ID)
     pub role: String, // User role

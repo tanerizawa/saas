@@ -24,6 +24,12 @@ impl UserId {
     pub fn as_uuid(&self) -> &Uuid {
         &self.0
     }
+
+    pub fn parse(s: &str) -> Result<Self, String> {
+        Uuid::parse_str(s)
+            .map(|uuid| Self(uuid))
+            .map_err(|_| "Invalid UUID format".to_string())
+    }
 }
 
 impl fmt::Display for UserId {

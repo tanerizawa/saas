@@ -19,6 +19,7 @@ pub struct InMemoryUserRepository {
 
 impl InMemoryUserRepository {
     /// Create a new empty in-memory user repository
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             users: Arc::new(Mutex::new(HashMap::new())),
@@ -26,6 +27,7 @@ impl InMemoryUserRepository {
     }
 
     /// Create a new in-memory user repository with some initial data
+    #[allow(dead_code)]
     pub fn with_users(users: Vec<User>) -> Self {
         let mut map = HashMap::new();
         for user in users {

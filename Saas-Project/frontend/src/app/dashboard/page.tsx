@@ -2,7 +2,8 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useRouter } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import Link from "next/link";
 import {
   BuildingOffice2Icon,
   DocumentTextIcon,
@@ -10,17 +11,71 @@ import {
   UsersIcon,
   BellIcon,
   Cog6ToothIcon,
+  ChartBarIcon,
+  BuildingOfficeIcon,
 } from "@heroicons/react/24/outline";
+
+interface DashboardStats {
+  totalLicenses: number;
+  activeCompanies: number;
+  pendingPayments: number;
+  activeUsers: number;
+}
 
 export default function DashboardPage() {
   const { user, logout, isLoading } = useAuth();
   const router = useRouter();
+  const [stats, setStats] = useState<DashboardStats>({
+    totalLicenses: 0,
+    activeCompanies: 0,
+    pendingPayments: 0,
+    activeUsers: 0,
+  });
+  const [statsLoading, setStatsLoading] = useState(true);
 
   useEffect(() => {
     if (!isLoading && !user) {
       router.push("/auth/login");
     }
   }, [user, isLoading, router]);
+
+  // Load dashboard stats
+  useEffect(() => {
+    const loadDashboardStats = async () => {
+      if (!user) return;
+      
+      try {
+        setStatsLoading(true);
+        
+        // Mock stats for demo - in real app, fetch from backend
+        const mockStats: DashboardStats = {
+          totalLicenses: user.role === "super_admin" ? 15 : 3,
+          activeCompanies: user.role === "super_admin" ? 8 : 1,
+          pendingPayments: user.role === "super_admin" ? 5 : 2,
+          activeUsers: user.role === "super_admin" ? 24 : 1,
+        };
+        
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        setStats(mockStats);
+        console.log("📊 Dashboard stats loaded:", mockStats);
+      } catch (error) {
+        console.error("Failed to load dashboard stats:", error);
+        // Set default stats on error
+        setStats({
+          totalLicenses: 0,
+          activeCompanies: 0,
+          pendingPayments: 0,
+          activeUsers: 0,
+        });
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    loadDashboardStats();
+  }, [user]);
 
   const handleLogout = async () => {
     try {
@@ -54,7 +109,7 @@ export default function DashboardPage() {
     {
       title: "Profil Perusahaan",
       description: "Informasi dan data perusahaan",
-      icon: BuildingOffice2Icon,
+      icon: BuildingOfficeIcon,
       href: "/companies",
       color: "bg-green-500",
     },
@@ -66,6 +121,13 @@ export default function DashboardPage() {
       color: "bg-yellow-500",
     },
     {
+      title: "Laporan",
+      description: "Laporan dan analisis bisnis",
+      icon: ChartBarIcon,
+      href: "/reports",
+      color: "bg-indigo-500",
+    },
+    {
       title: "Manajemen User",
       description: "Kelola pengguna dan hak akses",
       icon: UsersIcon,
@@ -75,8 +137,10 @@ export default function DashboardPage() {
     },
   ];
 
+  // Fix role-based filtering - include super_admin role
+  const isAdmin = user.role === "super_admin" || user.role === "admin_staff";
   const filteredCards = dashboardCards.filter(
-    (card) => !card.adminOnly || user.role === "admin_staff"
+    (card) => !card.adminOnly || isAdmin
   );
 
   return (
@@ -113,7 +177,8 @@ export default function DashboardPage() {
                     {user.full_name}
                   </div>
                   <div className="text-sm text-gray-500">
-                    {user.role === "admin_staff" ? "Admin Staff" : "UMKM Owner"}
+                    {user.role === "super_admin" ? "Super Administrator" : 
+                     user.role === "admin_staff" ? "Admin Staff" : "UMKM Owner"}
                   </div>
                 </div>
                 <button
@@ -144,7 +209,9 @@ export default function DashboardPage() {
                       <dt className="text-sm font-medium text-gray-500 truncate">
                         Total Izin
                       </dt>
-                      <dd className="text-lg font-medium text-gray-900">3</dd>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {statsLoading ? "..." : stats.totalLicenses}
+                      </dd>
                     </dl>
                   </div>
                 </div>
@@ -162,7 +229,9 @@ export default function DashboardPage() {
                       <dt className="text-sm font-medium text-gray-500 truncate">
                         Perusahaan Aktif
                       </dt>
-                      <dd className="text-lg font-medium text-gray-900">1</dd>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {statsLoading ? "..." : stats.activeCompanies}
+                      </dd>
                     </dl>
                   </div>
                 </div>
@@ -180,7 +249,9 @@ export default function DashboardPage() {
                       <dt className="text-sm font-medium text-gray-500 truncate">
                         Pembayaran Pending
                       </dt>
-                      <dd className="text-lg font-medium text-gray-900">2</dd>
+                      <dd className="text-lg font-medium text-gray-900">
+                        {statsLoading ? "..." : stats.pendingPayments}
+                      </dd>
                     </dl>
                   </div>
                 </div>
@@ -199,7 +270,7 @@ export default function DashboardPage() {
                         User Aktif
                       </dt>
                       <dd className="text-lg font-medium text-gray-900">
-                        {user.role === "admin_staff" ? "25" : "1"}
+                        {statsLoading ? "..." : stats.activeUsers}
                       </dd>
                     </dl>
                   </div>
@@ -217,13 +288,10 @@ export default function DashboardPage() {
               {filteredCards.map((card) => {
                 const IconComponent = card.icon;
                 return (
-                  <div
+                  <Link
                     key={card.title}
-                    className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer"
-                    onClick={() => {
-                      // For now, just show alert - will implement routing later
-                      alert(`Navigating to ${card.title}`);
-                    }}
+                    href={card.href}
+                    className="bg-white overflow-hidden shadow rounded-lg hover:shadow-md transition-shadow cursor-pointer block"
                   >
                     <div className="p-6">
                       <div className="flex items-center">
@@ -242,7 +310,7 @@ export default function DashboardPage() {
                         </div>
                       </div>
                     </div>
-                  </div>
+                  </Link>
                 );
               })}
             </div>

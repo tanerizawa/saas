@@ -81,6 +81,8 @@ governor = "0.6"
 # Metrics (Prometheus integration as recommended)
 metrics = "0.22"
 metrics-exporter-prometheus = "0.13"
+utoipa = "5.4.0"
+log = "0.4.27"
 
 # Redis client (for caching and sessions)
 # Redis dependency already included above

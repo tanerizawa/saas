@@ -33,6 +33,11 @@ interface AuthContextType {
   ) => Promise<{ message: string; user_id: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
+  // Role-based helpers
+  isSuperAdmin: () => boolean;
+  isAdminStaff: () => boolean;
+  isUmkmOwner: () => boolean;
+  getDefaultRoute: () => string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -51,24 +56,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     // Check for existing authentication on mount
     const checkAuth = () => {
+      console.log("🔍 AuthContext: Starting auth check...");
       try {
         if (isAuthenticated()) {
+          console.log("✅ AuthContext: User is authenticated");
           const currentUser = getCurrentUser();
           const currentToken = getToken();
+          console.log("👤 AuthContext: Current user:", currentUser);
+          console.log("🔑 AuthContext: Current token exists:", !!currentToken);
+          
           if (currentUser) {
             setUser(currentUser);
             setToken(currentToken);
+            console.log("✅ AuthContext: User state set successfully");
           } else {
+            console.log("⚠️ AuthContext: Token exists but no user data, trying to fetch profile");
             // Token exists but no user data, try to fetch profile
             refreshUser();
           }
         } else {
+          console.log("❌ AuthContext: User not authenticated, clearing auth");
           clearAuth();
         }
       } catch (error) {
-        console.error("Auth check failed:", error);
+        console.error("❌ AuthContext: Auth check failed:", error);
         clearAuth();
       } finally {
+        console.log("🏁 AuthContext: Auth check completed, setting loading to false");
         setLoading(false);
       }
     };
@@ -116,8 +130,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setToken(null);
       clearAuth();
       setLoading(false);
-      // Redirect to login page
-      window.location.href = "/auth/login";
+      
+      // Redirect to appropriate login based on current route
+      const currentPath = window.location.pathname;
+      if (currentPath.startsWith('/umkm/')) {
+        window.location.href = '/umkm/login';
+      } else {
+        window.location.href = '/auth/login';
+      }
     }
   };
 
@@ -139,6 +159,34 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  // Role-based helper functions
+  const isSuperAdmin = (): boolean => {
+    return user?.role === "super_admin";
+  };
+
+  const isAdminStaff = (): boolean => {
+    return user?.role === "admin_staff";
+  };
+
+  const isUmkmOwner = (): boolean => {
+    return user?.role === "umkm_owner";
+  };
+
+  const getDefaultRoute = (): string => {
+    if (!user) return '/';
+    
+    switch (user.role) {
+      case 'super_admin':
+        return '/admin';
+      case 'admin_staff':
+        return '/staff';
+      case 'umkm_owner':
+        return '/umkm/dashboard';
+      default:
+        return '/';
+    }
+  };
+
   const value: AuthContextType = {
     user,
     token,
@@ -149,6 +197,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     register,
     logout,
     refreshUser,
+    isSuperAdmin,
+    isAdminStaff,
+    isUmkmOwner,
+    getDefaultRoute,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

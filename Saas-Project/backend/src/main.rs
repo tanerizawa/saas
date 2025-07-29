@@ -1,9 +1,10 @@
 use axum::{response::Json, routing::get, Router};
 use std::sync::Arc;
 use tokio::net::TcpListener;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{CorsLayer, Any};
 use tower_http::services::ServeDir;
 use tracing::{info, instrument};
+use axum::http::{HeaderName, Method};
 
 // Import modules
 mod config;
@@ -18,11 +19,13 @@ use infrastructure::{
     database::DatabaseManager,
     repositories::{
         LicenseRepository, PostgresCompanyRepository, PostgresLicenseRepositoryImpl,
-        PostgresUserRepository,
+        PostgresUserRepository, PostgresOnboardingRepository, PostgresSystemConfigRepository,
+        PostgresEmailRepository, PostgresLicenseProcessingRepository, OnboardingRepository, 
+        SystemConfigRepository, EmailRepository, LicenseProcessingRepository,
     },
     web::handlers,
 };
-use services::auth::AuthService;
+use services::{auth::AuthService, email::EmailService};
 use shared::errors::AppError;
 
 // Simple AppContext for fresh setup
@@ -31,9 +34,14 @@ pub struct AppContext {
     pub config: AppConfig,
     pub db: DatabaseManager,
     pub auth_service: AuthService,
+    pub email_service: Arc<EmailService>,
     pub user_repository: Arc<dyn UserRepository + Send + Sync>,
     pub company_repository: Arc<dyn CompanyRepository + Send + Sync>,
     pub license_repository: Arc<dyn LicenseRepository + Send + Sync>,
+    pub onboarding_repository: Arc<dyn OnboardingRepository + Send + Sync>,
+    pub system_config_repository: Arc<dyn SystemConfigRepository + Send + Sync>,
+    pub email_repository: Arc<dyn EmailRepository + Send + Sync>,
+    pub license_processing_repository: Arc<dyn LicenseProcessingRepository + Send + Sync>,
 }
 
 // Implement the AppStateType trait for AppContext
@@ -54,8 +62,28 @@ impl infrastructure::web::handlers::AppStateType for AppContext {
         &self.license_repository
     }
 
+    fn onboarding_repository(&self) -> Arc<dyn infrastructure::repositories::OnboardingRepository + Send + Sync> {
+        self.onboarding_repository.clone()
+    }
+
+    fn system_config_repository(&self) -> Arc<dyn infrastructure::repositories::SystemConfigRepository + Send + Sync> {
+        self.system_config_repository.clone()
+    }
+
+    fn email_repository(&self) -> Arc<dyn infrastructure::repositories::EmailRepository + Send + Sync> {
+        self.email_repository.clone()
+    }
+
+    fn license_processing_repository(&self) -> Arc<dyn infrastructure::repositories::LicenseProcessingRepository + Send + Sync> {
+        self.license_processing_repository.clone()
+    }
+
     fn auth_service(&self) -> &services::auth::AuthService {
         &self.auth_service
+    }
+
+    fn email_service(&self) -> Arc<services::email::EmailService> {
+        self.email_service.clone()
     }
 
     fn config(&self) -> &config::AppConfig {
@@ -97,6 +125,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let company_repository = Arc::new(PostgresCompanyRepository::new(db.pool().clone()));
     let license_repository = Arc::new(PostgresLicenseRepositoryImpl::new(db.pool().clone()));
 
+    // Initialize new repositories
+    let onboarding_repository = Arc::new(PostgresOnboardingRepository::new(db.pool().clone()));
+    let system_config_repository = Arc::new(PostgresSystemConfigRepository::new(db.pool().clone()));  
+    let email_repository = Arc::new(PostgresEmailRepository::new(db.pool().clone()));
+    let license_processing_repository = Arc::new(PostgresLicenseProcessingRepository::new(db.pool().clone()));
+
+    // Initialize email service
+    let email_service = Arc::new(EmailService::new());
+
     info!("📊 Repositories initialized");
 
     // Create application context
@@ -104,9 +141,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         config: config.clone(),
         db,
         auth_service,
+        email_service,
         user_repository,
         company_repository,
         license_repository,
+        onboarding_repository,
+        system_config_repository,
+        email_repository,
+        license_processing_repository,
     });
 
     // Build application router
@@ -124,8 +166,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 #[instrument(skip(state))]
 async fn create_app(state: AppState) -> Router {
-    // Build the router with middleware
-    let mut router = Router::new().layer(CorsLayer::permissive());
+    // Build the router with CORS middleware (properly configured for browser preflight)
+    let cors = CorsLayer::new()
+        .allow_origin("http://127.0.0.1:3000".parse::<axum::http::HeaderValue>().unwrap())
+        .allow_methods([Method::GET, Method::POST, Method::PUT, Method::DELETE, Method::OPTIONS])
+        .allow_headers([
+            HeaderName::from_static("authorization"),
+            HeaderName::from_static("content-type"),
+            HeaderName::from_static("accept"),
+            HeaderName::from_static("origin"),
+            HeaderName::from_static("user-agent"),
+            HeaderName::from_static("cache-control"),
+            HeaderName::from_static("pragma"),
+        ])
+        .allow_credentials(true)
+        .max_age(std::time::Duration::from_secs(3600));
+    
+    let mut router = Router::new().layer(cors);
 
     // Add routes
     router = router
@@ -143,7 +200,10 @@ fn create_api_routes() -> Router<AppState> {
             "/auth/register",
             axum::routing::post(handlers::auth::register),
         )
-        .route("/auth/login", axum::routing::post(handlers::auth::login))
+        .route("/auth/login", 
+            axum::routing::post(handlers::auth::login)
+                .options(|| async { () }) // Add explicit OPTIONS handler
+        )
         .route(
             "/auth/refresh",
             axum::routing::post(handlers::auth::refresh_token),

@@ -12,7 +12,8 @@ use utoipa_swagger_ui::SwaggerUi;
 use tower_http::services::ServeDir;
 
 use crate::application::services::AuthService;
-use crate::domain::repositories::{UserRepository, CompanyRepository, LicenseRepository};
+use crate::domain::repositories::{UserRepository, CompanyRepository, LicenseRepository, OnboardingRepository, SystemConfigRepository, EmailRepository};
+use crate::services::email::EmailService;
 use crate::config::AppConfig;
 
 #[derive(Clone)]
@@ -20,8 +21,30 @@ pub struct AppState {
     pub user_repository: Arc<dyn UserRepository + Send + Sync>,
     pub company_repository: Arc<dyn CompanyRepository + Send + Sync>,
     pub license_repository: Arc<dyn LicenseRepository + Send + Sync>,
+    pub onboarding_repository: Arc<dyn OnboardingRepository + Send + Sync>,
+    pub system_config_repository: Arc<dyn SystemConfigRepository + Send + Sync>,
+    pub email_repository: Arc<dyn EmailRepository + Send + Sync>,
     pub auth_service: Arc<dyn AuthService + Send + Sync>,
+    pub email_service: Arc<EmailService>,
     pub config: AppConfig,
+}
+
+impl AppState {
+    pub fn email_service(&self) -> Arc<EmailService> {
+        self.email_service.clone()
+    }
+
+    pub fn onboarding_repository(&self) -> Arc<dyn OnboardingRepository + Send + Sync> {
+        self.onboarding_repository.clone()
+    }
+
+    pub fn system_config_repository(&self) -> Arc<dyn SystemConfigRepository + Send + Sync> {
+        self.system_config_repository.clone()
+    }
+
+    pub fn email_repository(&self) -> Arc<dyn EmailRepository + Send + Sync> {
+        self.email_repository.clone()
+    }
 }
 
 #[derive(OpenApi)]

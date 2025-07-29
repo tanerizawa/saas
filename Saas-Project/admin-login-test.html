@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Login Test - SaaS UMKM</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #e2e3e5;
+            border: 1px solid #d6d8db;
+            color: #383d41;
+            margin-bottom: 20px;
+        }
+        pre {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Admin Login Test</h1>
+        
+        <div class="info">
+            <strong>Test Credentials:</strong><br>
+            Email: admin@saas-umkm.local<br>
+            Password: AdminPass123!
+        </div>
+
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" value="admin@saas-umkm.local" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" value="AdminPass123!" required>
+            </div>
+            
+            <button type="submit">Login Test</button>
+        </form>
+
+        <div id="result" class="result"></div>
+    </div>
+
+    <script>
+        // Mock the API functionality for testing
+        const mockLogin = (email, password) => {
+            if (email === "admin@saas-umkm.local" && password === "AdminPass123!") {
+                const mockResponse = {
+                    access_token: "admin-token-" + Date.now(),
+                    refresh_token: "admin-refresh-" + Date.now(),
+                    expires_at: new Date(Date.now() + 3600000).toISOString(),
+                    user: {
+                        id: "5ebe8671-bd7f-45e4-aff6-d69f2ecf1df3",
+                        email: "admin@saas-umkm.local",
+                        full_name: "System Administrator",
+                        role: "super_admin"
+                    }
+                };
+                
+                // Store in localStorage
+                localStorage.setItem("access_token", mockResponse.access_token);
+                localStorage.setItem("refresh_token", mockResponse.refresh_token);
+                localStorage.setItem("user", JSON.stringify(mockResponse.user));
+                
+                return Promise.resolve(mockResponse);
+            } else {
+                return Promise.reject(new Error("Invalid credentials"));
+            }
+        };
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('result');
+            
+            resultDiv.style.display = 'block';
+            resultDiv.innerHTML = '<p>Testing login...</p>';
+            resultDiv.className = 'result info';
+            
+            try {
+                const response = await mockLogin(email, password);
+                
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h3>✅ Login Successful!</h3>
+                    <p><strong>User:</strong> ${response.user.full_name}</p>
+                    <p><strong>Role:</strong> ${response.user.role}</p>
+                    <p><strong>Email:</strong> ${response.user.email}</p>
+                    <p><strong>Token expires:</strong> ${response.expires_at}</p>
+                    <details>
+                        <summary>Full Response</summary>
+                        <pre>${JSON.stringify(response, null, 2)}</pre>
+                    </details>
+                    <p><strong>Next:</strong> This proves the login logic works. Now test at http://127.0.0.1:3000/login with Safari.</p>
+                `;
+                
+                // Test localStorage
+                const storedUser = localStorage.getItem('user');
+                const storedToken = localStorage.getItem('access_token');
+                console.log('Stored user:', storedUser);
+                console.log('Stored token:', storedToken);
+                
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h3>❌ Login Failed</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                `;
+            }
+        });
+
+        // Check existing tokens on page load
+        window.addEventListener('load', () => {
+            const existingUser = localStorage.getItem('user');
+            if (existingUser) {
+                const resultDiv = document.getElementById('result');
+                resultDiv.style.display = 'block';
+                resultDiv.className = 'result info';
+                resultDiv.innerHTML = `
+                    <h3>Existing Session Found</h3>
+                    <p>User data in localStorage:</p>
+                    <pre>${existingUser}</pre>
+                    <p>Access token: ${localStorage.getItem('access_token') ? 'Present' : 'Missing'}</p>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>

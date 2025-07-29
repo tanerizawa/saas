@@ -25,6 +25,10 @@ impl UserId {
         &self.0
     }
 
+    pub fn into_inner(self) -> Uuid {
+        self.0
+    }
+
     pub fn parse(s: &str) -> Result<Self, String> {
         Uuid::parse_str(s)
             .map(|uuid| Self(uuid))
@@ -97,6 +101,24 @@ impl LicenseId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
+
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
+    pub fn as_uuid(&self) -> &Uuid {
+        &self.0
+    }
+
+    pub fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl fmt::Display for LicenseId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -148,6 +170,33 @@ pub struct BusinessId(pub Uuid);
 impl BusinessId {
     pub fn new() -> Self {
         Self(Uuid::new_v4())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CompanyId(pub Uuid);
+
+impl CompanyId {
+    pub fn new() -> Self {
+        Self(Uuid::new_v4())
+    }
+
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
+    pub fn as_uuid(&self) -> &Uuid {
+        &self.0
+    }
+
+    pub fn into_inner(self) -> Uuid {
+        self.0
+    }
+}
+
+impl fmt::Display for CompanyId {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
     }
 }
 

@@ -9,7 +9,12 @@ pub trait AppStateType: Send + Sync {
     fn company_repository(&self) -> &Arc<dyn crate::domain::repositories::CompanyRepository + Send + Sync>;
     fn user_repository(&self) -> &Arc<dyn crate::domain::repositories::UserRepository + Send + Sync>;
     fn license_repository(&self) -> &Arc<dyn crate::infrastructure::repositories::LicenseRepository + Send + Sync>;
+    fn onboarding_repository(&self) -> Arc<dyn crate::infrastructure::repositories::OnboardingRepository + Send + Sync>;
+    fn system_config_repository(&self) -> Arc<dyn crate::infrastructure::repositories::SystemConfigRepository + Send + Sync>;
+    fn email_repository(&self) -> Arc<dyn crate::infrastructure::repositories::EmailRepository + Send + Sync>;
+    fn license_processing_repository(&self) -> Arc<dyn crate::infrastructure::repositories::LicenseProcessingRepository + Send + Sync>;
     fn auth_service(&self) -> &crate::services::auth::AuthService;
+    fn email_service(&self) -> Arc<crate::services::email::EmailService>;
     fn config(&self) -> &AppConfig;
     fn cache_service(&self) -> &Option<crate::infrastructure::cache::CacheService>;
 }
@@ -20,5 +25,8 @@ use crate::config::AppConfig;
 pub mod admin;
 pub mod auth;
 pub mod users;
+pub mod onboarding_handler;
+pub mod license_processing_handler;
+pub mod system_config_handler;
 // TODO: Fix trait bounds compilation issues - companies handlers need auth middleware fixes
 // pub mod companies;

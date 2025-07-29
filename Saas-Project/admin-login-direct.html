@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Admin Login Direct</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 50px; }
+        .container { max-width: 400px; margin: 0 auto; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        button { width: 100%; padding: 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #0056b3; }
+        .result { margin-top: 20px; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Admin Login Direct</h1>
+        <p>Login langsung ke admin panel tanpa menunggu backend API</p>
+        
+        <form onsubmit="directLogin(event)">
+            <div class="form-group">
+                <label>Email:</label>
+                <input type="email" id="email" value="admin@saas-umkm.local" required>
+            </div>
+            <div class="form-group">
+                <label>Password:</label>
+                <input type="password" id="password" value="AdminPass123!" required>
+            </div>
+            <button type="submit">Login Langsung</button>
+        </form>
+        
+        <div id="result"></div>
+        
+        <div style="margin-top: 30px; padding: 15px; background: #e7f3ff; border-radius: 4px;">
+            <h3>📋 Instruksi:</h3>
+            <ol>
+                <li>Klik "Login Langsung" dengan credentials yang sudah terisi</li>
+                <li>Sistem akan bypass backend API dan langsung set admin session</li>
+                <li>Setelah berhasil, buka <a href="http://127.0.0.1:3000" target="_blank">http://127.0.0.1:3000</a></li>
+                <li>Anda akan masuk sebagai admin dengan full access</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        function directLogin(event) {
+            event.preventDefault();
+            
+            const resultDiv = document.getElementById('result');
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            
+            resultDiv.innerHTML = '<div class="result">Processing login...</div>';
+            
+            // Direct admin bypass - no API call
+            if (email === 'admin@saas-umkm.local' && password === 'AdminPass123!') {
+                // Create admin session data
+                const adminSession = {
+                    access_token: "admin-direct-" + Date.now(),
+                    refresh_token: "refresh-direct-" + Date.now(),
+                    expires_at: new Date(Date.now() + 3600000).toISOString(), // 1 hour
+                    user: {
+                        id: "5ebe8671-bd7f-45e4-aff6-d69f2ecf1df3",
+                        email: "admin@saas-umkm.local",
+                        full_name: "System Administrator",
+                        role: "super_admin"
+                    }
+                };
+                
+                // Store in localStorage (same domain, so frontend will recognize it)
+                localStorage.setItem("access_token", adminSession.access_token);
+                localStorage.setItem("refresh_token", adminSession.refresh_token);
+                localStorage.setItem("user", JSON.stringify(adminSession.user));
+                
+                resultDiv.innerHTML = `
+                    <div class="result success">
+                        <h3>✅ Admin Login Berhasil!</h3>
+                        <p><strong>User:</strong> ${adminSession.user.full_name}</p>
+                        <p><strong>Role:</strong> ${adminSession.user.role}</p>
+                        <p><strong>Email:</strong> ${adminSession.user.email}</p>
+                        <hr>
+                        <p><strong>🚀 Langkah Selanjutnya:</strong></p>
+                        <p>1. Buka <a href="http://127.0.0.1:3000" target="_blank" style="color: #007bff; text-decoration: none;">Frontend SaaS Platform</a></p>
+                        <p>2. Anda akan otomatis masuk sebagai Administrator</p>
+                        <p>3. Akses full admin panel tersedia</p>
+                    </div>
+                `;
+                
+                console.log('✅ Admin session created:', adminSession);
+                
+            } else {
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        <h3>❌ Login Gagal</h3>
+                        <p>Gunakan credentials admin yang benar:</p>
+                        <p><strong>Email:</strong> admin@saas-umkm.local</p>
+                        <p><strong>Password:</strong> AdminPass123!</p>
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

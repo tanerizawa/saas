@@ -1,7 +1,7 @@
 //! Database setup utility
 //! This utility checks if the database is available and sets up the required tables
 
-use sqlx::postgres::{PgPoolOptions, PgPool};
+use sqlx::postgres::PgPoolOptions;
 use std::env;
 use std::process::exit;
 use std::time::Duration;

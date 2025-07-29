@@ -32,6 +32,7 @@ use infrastructure::{
     },
     web::handlers,
 };
+use crate::infrastructure::cache::CacheService;
 use services::auth::AuthService;
 use shared::errors::AppError;
 
@@ -93,7 +94,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("📋 Configuration loaded");
 
     // Initialize database connection
-    let db = DatabaseConnection::new(&config.database_url).await?;
+    let db = DatabaseManager::new(&config.database_url, 5).await?;
     info!("🗄️ Database connection established");
 
     // Run migrations
@@ -139,7 +140,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         None => {
             tracing::info!("🔄 Initializing standard license repository (no cache)");
-            Arc::new(CachedLicenseRepository::new(db.pool().clone()))
+            Arc::new(CachedLicenseRepository::<CacheService>::new(db.pool().clone()))
         }
     };
 
@@ -184,7 +185,7 @@ async fn create_app(state: AppState) -> Router {
     router = router.layer(TraceLayer::new_for_http());
 
     // Add compression if enabled
-    if state.config.enable_compression {
+    if state.config().enable_compression {
         router = router.layer(CompressionLayer::new());
     }
 
@@ -201,12 +202,12 @@ async fn create_app(state: AppState) -> Router {
         // Health check endpoint
         .route("/health", get(health_check))
         // Static file serving for uploads
-        .nest_service("/uploads", ServeDir::new(state.config.upload_dir.clone()))
+        .nest_service("/uploads", ServeDir::new(state.config().upload_dir.clone()))
         // API routes
         .nest("/api/v1", create_api_routes());
 
     // Add rate limiting middleware if configured
-    router = if state.config.rate_limiter.is_some() {
+    router = if state.config().rate_limiter.is_some() {
         use crate::infrastructure::web::middleware::auth::require_auth;
         router.route_layer(axum::middleware::from_fn_with_state(
             state.clone(),

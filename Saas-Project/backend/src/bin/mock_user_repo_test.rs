@@ -132,8 +132,8 @@ impl UserRepository for MockUserRepository {
         }
     }
     
-    async fn list_all(&self, limit: Option<i32>, offset: Option<i32>) -> AppResult<Vec<User>> {
-        println!("Listing users with limit: {:?}, offset: {:?}", limit, offset);
+    async fn list_all(&self, _limit: Option<i32>, _offset: Option<i32>) -> AppResult<Vec<User>> {
+        println!("Listing users with limit: {:?}, offset: {:?}", _limit, _offset);
         // In a real implementation, we would apply limit and offset
         Ok(self.users.clone())
     }
@@ -143,7 +143,7 @@ impl UserRepository for MockUserRepository {
         Ok(self.users.len() as i64)
     }
     
-    async fn search(&self, query: &str, limit: Option<i32>, offset: Option<i32>) -> AppResult<Vec<User>> {
+    async fn search(&self, query: &str, _limit: Option<i32>, _offset: Option<i32>) -> AppResult<Vec<User>> {
         println!("Searching users for: {}", query);
         // Very simple search implementation
         let results: Vec<User> = self.users.iter()

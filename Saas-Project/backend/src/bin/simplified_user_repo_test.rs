@@ -524,7 +524,7 @@ async fn create_test_users(repo: &PostgresUserRepository, count: usize) -> Vec<U
 }
 
 // Test for basic CRUD operations
-async fn test_crud_operations(pool: &PgPool, schema_name: &str) -> TestResult<()> {
+async fn test_crud_operations(pool: &PgPool, _schema_name: &str) -> TestResult<()> {
     // Setup
     let repo = PostgresUserRepository::new(pool.clone());
     
@@ -587,7 +587,7 @@ async fn test_crud_operations(pool: &PgPool, schema_name: &str) -> TestResult<()
 }
 
 // Tests for pagination
-async fn test_list_all_with_pagination(pool: &PgPool, schema_name: &str) -> TestResult<()> {
+async fn test_list_all_with_pagination(pool: &PgPool, _schema_name: &str) -> TestResult<()> {
     // Setup
     let repo = PostgresUserRepository::new(pool.clone());
     
@@ -614,7 +614,7 @@ async fn test_list_all_with_pagination(pool: &PgPool, schema_name: &str) -> Test
 }
 
 // Tests for search
-async fn test_search_users(pool: &PgPool, schema_name: &str) -> TestResult<()> {
+async fn test_search_users(pool: &PgPool, _schema_name: &str) -> TestResult<()> {
     // Setup
     let repo = PostgresUserRepository::new(pool.clone());
     
@@ -682,7 +682,7 @@ async fn test_search_users(pool: &PgPool, schema_name: &str) -> TestResult<()> {
 }
 
 // Test for error handling
-async fn test_error_handling(pool: &PgPool, schema_name: &str) -> TestResult<()> {
+async fn test_error_handling(pool: &PgPool, _schema_name: &str) -> TestResult<()> {
     // Setup
     let repo = PostgresUserRepository::new(pool.clone());
     

@@ -8,7 +8,7 @@ use std::error::Error;
 use saas_umkm_backend::domain::entities::{User, UserRole, UserStatus};
 use saas_umkm_backend::domain::repositories::UserRepository;
 use saas_umkm_backend::domain::value_objects::{Email, UserId};
-use saas_umkm_backend::infrastructure::repositories::InMemoryUserRepository;
+use saas_umkm_backend::infrastructure::repositories::in_memory_user_repository::InMemoryUserRepository;
 
 type DemoResult<T> = Result<T, Box<dyn Error>>;
 

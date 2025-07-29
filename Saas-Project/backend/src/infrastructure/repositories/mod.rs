@@ -13,6 +13,5 @@ pub mod transaction_repository;
 pub use cached_license_repository::CachedLicenseRepository;
 pub use cached_license_repository::LicenseRepository;
 pub use company_repository::PostgresCompanyRepository;
-pub use in_memory_user_repository::InMemoryUserRepository;
 // pub use license_repository::PostgresLicenseRepositoryImpl;
 pub use postgres_user_repository::PostgresUserRepository;

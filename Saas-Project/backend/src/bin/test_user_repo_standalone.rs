@@ -1,7 +1,7 @@
 //! Simple test for user repository functionality
 //! This is an isolated test to verify the user repository works correctly
 
-use sqlx::{PgPool, postgres::PgPoolOptions, Row};
+use sqlx::{postgres::PgPoolOptions, Row};
 use uuid::Uuid;
 
 use std::env;

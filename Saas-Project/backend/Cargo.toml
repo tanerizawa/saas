@@ -19,6 +19,10 @@ sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chron
 sea-query = "0.30"
 sea-query-postgres = "0.4"
 
+[env]
+# Disable SQLx offline mode untuk development
+SQLX_OFFLINE = "false"
+
 # Caching (Redis for Phase 4 performance optimization)
 redis = { version = "0.24", features = ["tokio-comp", "json", "connection-manager"] }
 

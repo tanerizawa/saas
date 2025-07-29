@@ -5,6 +5,7 @@ use crate::domain::licenses::{ApplicationStatus, LicenseType, PriorityLevel};
 
 /// Request payload for submitting a license application
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 pub struct LicenseApplicationRequest {
     pub company_id: Uuid,
     pub license_type: LicenseType,
@@ -15,6 +16,7 @@ pub struct LicenseApplicationRequest {
 
 /// Simple response returned after creating a license application
 #[derive(Debug, Serialize)]
+#[allow(dead_code)]
 pub struct LicenseApplicationResponse {
     pub id: Uuid,
     pub status: ApplicationStatus,

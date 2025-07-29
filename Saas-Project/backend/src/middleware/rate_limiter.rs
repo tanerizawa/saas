@@ -20,6 +20,7 @@ use crate::infrastructure::web::handlers::AppState;
 // Simple in-memory rate limiter
 // For production, this would be better implemented with Redis
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct RateLimiter {
     // Map of IP addresses to a list of request timestamps
     requests: Arc<Mutex<HashMap<IpAddr, Vec<Instant>>>>,
@@ -38,6 +39,7 @@ impl RateLimiter {
         }
     }
 
+    #[allow(dead_code)]
     async fn is_rate_limited(&self, ip: IpAddr) -> bool {
         let now = Instant::now();
         let window = Duration::from_secs(self.window_secs);
